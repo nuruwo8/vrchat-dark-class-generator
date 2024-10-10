@@ -7,21 +7,18 @@ using UnityEditor;
 using UnityEditorInternal;
 using UnityEngine;
 
-namespace Nuruwo
+namespace Nuruwo.Tool
 {
     public class DarkClassGeneratorEditorWindow : EditorWindow
     {
+        /*------------------------------private values----------------------------------*/
         private ReorderableList _reorderableList;
         private string _className = string.Empty;
         private string _nameSpace = string.Empty;
         private List<string> _fieldList = new List<string>() { "int value" };
-
-        /*------------------------------caractor serach----------------------------------*/
-        //for textArea scroll
-        private Vector2 _scrollPosition = Vector2.zero;
-        //coppied charactors on scene.
-        string _result = string.Empty;
-        string _code = string.Empty;
+        private Vector2 _scrollPosition = Vector2.zero; //for textArea scroll
+        private string _result = string.Empty;
+        private string _code = string.Empty;
 
         /*------------------------------Initialize------------------------------*/
         [MenuItem("Tools/Nuruwo/DarkClassGenerator", false, 1)]
@@ -55,7 +52,7 @@ namespace Nuruwo
         {
             //namespace
             EditorGUILayout.Space(10);
-            _nameSpace = EditorGUILayout.TextField("namespace", _nameSpace);
+            _nameSpace = EditorGUILayout.TextField("namespace (optional)", _nameSpace);
             EditorGUILayout.Space(10);
 
             //Class name
@@ -63,16 +60,21 @@ namespace Nuruwo
             _className = EditorGUILayout.TextField("Class name", _className);
             EditorGUILayout.Space(10);
 
-            //Augument list
+            //Augment list
             _reorderableList.DoLayoutList();
 
-            //Generate 
-            if (GUILayout.Button("Generate DarkClass"))
+            //Generate button
+            var canGenerate = !string.IsNullOrEmpty(_className) && _fieldList.Count > 0 && !string.IsNullOrEmpty(_fieldList[0]);
+            using (new EditorGUI.DisabledScope(!canGenerate))
             {
-                _code = GenerateDarkClass();
-                //clip board
-                EditorGUIUtility.systemCopyBuffer = _code;
-                _result = "Code is generated and Copied to clipboard.";
+                //Generate 
+                if (GUILayout.Button("Generate DarkClass"))
+                {
+                    _code = GenerateDarkClass();
+                    //clip board
+                    EditorGUIUtility.systemCopyBuffer = _code;
+                    _result = "Code is generated and Copied to clipboard.";
+                }
             }
             EditorGUILayout.Space(10);
 
