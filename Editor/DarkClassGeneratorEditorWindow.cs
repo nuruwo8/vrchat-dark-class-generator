@@ -87,6 +87,8 @@ namespace Nuruwo
             EditorGUILayout.EndScrollView();
         }
 
+        /*------------------------------ Generate Function ------------------------------*/
+
         private string GenerateDarkClass()
         {
             var sb = new StringBuilder();
@@ -127,6 +129,8 @@ namespace Nuruwo
             //result
             return sb.ToString();
         }
+        
+        /*------------------------------ Generate Parts Functions ------------------------------*/
         private string GenerateClassFooter(bool nameSpaceIsExist)
         {
             return nameSpaceIsExist ? "\t}\r\n" : "}\r\n";
