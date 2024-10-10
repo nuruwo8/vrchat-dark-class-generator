@@ -95,7 +95,7 @@ namespace Nuruwo.Tool
             var pClassName = ToPascal(_className);
             var enumName = pClassName + "Field";
 
-            sb.Append(GenerateNameSpaceHeader(_nameSpace));
+            sb.Append(GenerateHeaderWithNameSpace(_nameSpace));
             var nameSpaceIsExist = !string.IsNullOrEmpty(_nameSpace);
             var nst = nameSpaceIsExist ? 1 : 0; //namespace tab number
 
@@ -149,7 +149,7 @@ namespace Nuruwo.Tool
             }
             return sb.ToString();
         }
-        private string GenerateNameSpaceHeader(string nameSpace)
+        private string GenerateHeaderWithNameSpace(string nameSpace)
         {
             var sb = new StringBuilder();
             sb.AppendLine($"using UdonSharp;");
@@ -184,6 +184,8 @@ namespace Nuruwo.Tool
         private string GenerateClassHeader(string pClassName)
         {
             var sb = new StringBuilder();
+
+            sb.AppendLine($"[AddComponentMenu(\"\")]");
             sb.AppendLine($"public class {pClassName} : UdonSharpBehaviour");
             sb.AppendLine($"{{");
             return sb.ToString();
