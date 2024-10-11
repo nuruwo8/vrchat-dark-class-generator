@@ -1,12 +1,13 @@
-# vrchat-dark-class-generator
-DarkClass is to make your custom UdonSharp class used in VRChat
+# DarkClass generator for VRChat
+DarkClass is to make your custom UdonSharp class
 
-
+## Generate your DarkClass
 You can call up this tool by clicking <Tools/Nuruwo/DarkClassGenerator> in the Editor menu.
 As shown in the image, enter these items and press the button to generate the code.
 
-<kbd><img src="ReadMeImages/usage_example.png" alt="" width="700"/></kbd><br><br>
+<kbd><img src="ReadMeImages/usage_example.png" alt="" width="800"/></kbd><br><br>
 
+## Usage generated DarkClass in your UdonSharp scripts
 Generated class can be used in other UdonSharp scripts as follows.
 
 ```cs
@@ -35,5 +36,11 @@ namespace Nuruwo.Dev
 }
 ```
 
+## Load parameters from a DarkClass script file
+Open the fold as shown in the image and specify aDarkClass script to extract each parameter.
+
+<kbd><img src="ReadMeImages/load_parameters.png" alt="" width="800"/></kbd><br><br>
+
+## Reference
 See detail technical article
 https://power-of-tech.hatenablog.com/entry/2024/06/12/191828
