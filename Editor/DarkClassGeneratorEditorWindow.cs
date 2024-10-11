@@ -14,7 +14,10 @@ namespace Nuruwo.Tool
     public class DarkClassGeneratorEditorWindow : EditorWindow
     {
         /*------------------------------private values----------------------------------*/
-        private bool _foldIsOpen = false;
+        private bool _loadFoldIsOpen = false;
+        private bool _optionFoldIsOpen = false;
+
+        private bool _generateSetMethod = true;
 
         private TextAsset _textAsset;
         private string _prevScriptName = string.Empty;
@@ -45,8 +48,8 @@ namespace Nuruwo.Tool
             //load from script
             EditorGUILayout.Space(10);
             EditorGUILayout.BeginVertical(GUI.skin.box);
-            _foldIsOpen = EditorGUILayout.Foldout(_foldIsOpen, "Load parameters from script");
-            if (_foldIsOpen)
+            _loadFoldIsOpen = EditorGUILayout.Foldout(_loadFoldIsOpen, "Load class parameters from script");
+            if (_loadFoldIsOpen)
             {
                 EditorGUI.indentLevel++;
                 EditorGUILayout.Space(10);
@@ -92,6 +95,18 @@ namespace Nuruwo.Tool
             EditorGUILayout.EndVertical();
             EditorGUILayout.Space(10);
 
+            //options
+            EditorGUILayout.BeginVertical(GUI.skin.box);
+            _optionFoldIsOpen = EditorGUILayout.Foldout(_optionFoldIsOpen, "Options");
+            if (_optionFoldIsOpen)
+            {
+                EditorGUI.indentLevel++;
+                _generateSetMethod = EditorGUILayout.Toggle("Generate Set methods", _generateSetMethod);
+                EditorGUI.indentLevel--;
+            }
+            EditorGUILayout.EndVertical();
+            EditorGUILayout.Space(10);
+
             //Generate button
             var canGenerate = !string.IsNullOrEmpty(_className) && _fieldList.Count > 0 && !string.IsNullOrEmpty(_fieldList[0]);
             using (new EditorGUI.DisabledScope(!canGenerate))
@@ -99,7 +114,7 @@ namespace Nuruwo.Tool
                 //Generate 
                 if (GUILayout.Button("Generate DarkClass"))
                 {
-                    _generatedCode = GenerateDarkClass();
+                    _generatedCode = GenerateDarkClass(_generateSetMethod);
                     //clip board
                     EditorGUIUtility.systemCopyBuffer = _generatedCode;
                     _result = "Code is generated and Copied to clipboard.";
@@ -118,9 +133,28 @@ namespace Nuruwo.Tool
             EditorGUILayout.EndScrollView();
         }
 
+        private void UpdateReorderableList(List<string> list)
+        {
+            _fieldList = list;
+            _reorderableList = new ReorderableList(
+              elements: _fieldList,
+              elementType: typeof(string),
+              draggable: true,
+              displayHeader: true,
+              displayAddButton: true,
+              displayRemoveButton: true
+            );
+            _reorderableList.drawHeaderCallback = rect => EditorGUI.LabelField(rect, "Field List");
+            _reorderableList.elementHeightCallback = index => 20;
+            _reorderableList.drawElementCallback = (rect, index, isActive, isFocused) =>
+            {
+                _fieldList[index] = EditorGUI.TextField(rect, "  Field " + index, _fieldList[index]);
+            };
+        }
+
         /*------------------------------Generate DarkClass-----------------------------*/
 
-        private string GenerateDarkClass()
+        private string GenerateDarkClass(bool generateSetMethod)
         {
             var sb = new StringBuilder();
             var pClassName = ToPascal(_className);
@@ -151,10 +185,13 @@ namespace Nuruwo.Tool
             sb.Append(AddTabLines("// Get methods\r\n", nst + 1));
             var getMethodsString = GenerateGetMethods(pClassName, enumName, _fieldList);
             sb.Append(AddTabLines(getMethodsString, nst + 1));
-            sb.AppendLine();
-            sb.Append(AddTabLines("// Set methods\r\n", nst + 1));
-            var setMethodsString = GenerateSetMethods(pClassName, enumName, _fieldList);
-            sb.Append(AddTabLines(setMethodsString, nst + 1));
+            if (generateSetMethod)
+            {
+                sb.AppendLine();
+                sb.Append(AddTabLines("// Set methods\r\n", nst + 1));
+                var setMethodsString = GenerateSetMethods(pClassName, enumName, _fieldList);
+                sb.Append(AddTabLines(setMethodsString, nst + 1));
+            }
             sb.Append(GenerateFooter(nameSpaceIsExist));
 
             //result
@@ -180,6 +217,7 @@ namespace Nuruwo.Tool
             }
             return sb.ToString();
         }
+
         private string GenerateHeaderWithNameSpace(string nameSpace)
         {
             var sb = new StringBuilder();
@@ -311,28 +349,60 @@ namespace Nuruwo.Tool
         private void LoadScript(string text)
         {
             Debug.Log("LoadScript: " + text);
-            var rows = text.Replace("\r\n", "\n").Split(new[] { '\n', '\r' });
-            text = text.Replace("\r\n", "\n").Replace("\n", " "); //remove line break and join with space
+            var oneLineText = text.Replace("\r\n", "\n").Replace("\n", " "); //remove line break and join with space
 
             //namespace
-            _nameSpace = ExtractNameSpace(text);
+            _nameSpace = ExtractNameSpace(oneLineText);
 
             //className
-            _className = ExtractClassName(text);
+            _className = ExtractClassName(oneLineText);
 
             //Fields
             if (!string.IsNullOrEmpty(_className))
             {
-                var fieldStrings = ExtractFields(text, _className);
+                var fieldStrings = ExtractFields(oneLineText, _className);
                 if (fieldStrings.Count > 0) { UpdateReorderableList(fieldStrings); }
             }
         }
 
-        private List<string> ExtractFields(string text, string className)
+        private string ExtractNameSpace(string oneLineText)
+        {
+            var matches = Regex.Matches(oneLineText, @"\s*namespace\s+[^\s]+\s+");
+            if (matches.Count() <= 0) { return string.Empty; }
+            var match = matches[0].Value.Trim();
+            if (!string.IsNullOrEmpty(match))
+            {
+                var words = Regex.Split(match, @"\s+");
+                if (words.Length >= 2)
+                {
+                    return words[1];
+                }
+            }
+            return string.Empty;
+        }
+
+        private string ExtractClassName(string oneLineText)
+        {
+            var matches = Regex.Matches(oneLineText, @"\s*public\s+class\s+[^\s]+\s+:");
+            if (matches.Count() <= 0) { return string.Empty; }
+            var match = matches[0].Value.Trim();
+            if (!string.IsNullOrEmpty(match))
+            {
+                var words = Regex.Split(match, @"\s+");
+                var classIndex = Array.IndexOf(words, "class");
+                if (words.Length >= classIndex + 1)
+                {
+                    return words[classIndex + 1];
+                }
+            }
+            return string.Empty;
+        }
+
+        private List<string> ExtractFields(string oneLineText, string className)
         {
             var fields = new List<string>();
 
-            var matches = Regex.Matches(text, @"\s*public\s+static\s+" + className + @"\s+New\s*\([^\)]+\)");
+            var matches = Regex.Matches(oneLineText, @"\s*public\s+static\s+" + className + @"\s+New\s*\([^\)]+\)");
             if (matches.Count() <= 0) { return fields; }
             var match = matches[0].Value.Trim();
             if (!string.IsNullOrEmpty(match))
@@ -352,58 +422,6 @@ namespace Nuruwo.Tool
             }
 
             return fields;
-        }
-
-        private string ExtractClassName(string text)
-        {
-            var matches = Regex.Matches(text, @"\s*public\s+class\s+([a-zA-Z0-9_]+)\s+:");
-            if (matches.Count() <= 0) { return string.Empty; }
-            var match = matches[0].Value.Trim();
-            if (!string.IsNullOrEmpty(match))
-            {
-                var words = Regex.Split(match, @"\s+");
-                var classIndex = Array.IndexOf(words, "class");
-                if (words.Length >= classIndex + 1)
-                {
-                    return words[classIndex + 1];
-                }
-            }
-            return string.Empty;
-        }
-
-        private string ExtractNameSpace(string text)
-        {
-            var matches = Regex.Matches(text, @"\s*namespace\s+([a-zA-Z0-9_.]+)\s");
-            if (matches.Count() <= 0) { return string.Empty; }
-            var match = matches[0].Value.Trim();
-            if (!string.IsNullOrEmpty(match))
-            {
-                var words = Regex.Split(match, @"\s+");
-                if (words.Length >= 2)
-                {
-                    return words[1];
-                }
-            }
-            return string.Empty;
-        }
-
-        private void UpdateReorderableList(List<string> list)
-        {
-            _fieldList = list;
-            _reorderableList = new ReorderableList(
-              elements: _fieldList,
-              elementType: typeof(string),
-              draggable: true,
-              displayHeader: true,
-              displayAddButton: true,
-              displayRemoveButton: true
-            );
-            _reorderableList.drawHeaderCallback = rect => EditorGUI.LabelField(rect, "Field List");
-            _reorderableList.elementHeightCallback = index => 20;
-            _reorderableList.drawElementCallback = (rect, index, isActive, isFocused) =>
-            {
-                _fieldList[index] = EditorGUI.TextField(rect, "  Field " + index, _fieldList[index]);
-            };
         }
 
         /*------------------------------Utility----------------------------------*/
