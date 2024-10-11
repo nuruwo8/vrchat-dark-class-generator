@@ -315,17 +315,15 @@ namespace Nuruwo.Tool
             text = text.Replace("\r\n", "\n").Replace("\n", " "); //remove line break and join with space
 
             //namespace
-            var namespaceString = ExtractNameSpace(text);
-            if (!string.IsNullOrEmpty(namespaceString)) { _nameSpace = namespaceString; }
+            _nameSpace = ExtractNameSpace(text);
 
             //className
-            var classNameString = ExtractClassName(text);
-            if (!string.IsNullOrEmpty(classNameString)) { _className = classNameString; }
+            _className = ExtractClassName(text);
 
             //Fields
-            if (!string.IsNullOrEmpty(classNameString))
+            if (!string.IsNullOrEmpty(_className))
             {
-                var fieldStrings = ExtractFields(text, classNameString);
+                var fieldStrings = ExtractFields(text, _className);
                 if (fieldStrings.Count > 0) { UpdateReorderableList(fieldStrings); }
             }
         }
