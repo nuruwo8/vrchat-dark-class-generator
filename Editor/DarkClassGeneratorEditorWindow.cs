@@ -205,7 +205,7 @@ namespace Nuruwo.Tool
         private string AddTabLines(string srcText, int tabNum)
         {
             var sb = new StringBuilder();
-            var texts = srcText.Split("\r\n");
+            var texts = srcText.Replace("\r\n", "\n").Split("\n");
             for (int i = 0; i < texts.Length - 1; i++)  //last line is empty
             {
                 var tabText = String.Copy(texts[i]);
@@ -237,11 +237,10 @@ namespace Nuruwo.Tool
             var sb = new StringBuilder();
             sb.AppendLine($"enum {enumName}");
             sb.AppendLine($"{{");
-            foreach (var argument in _fieldList)
+            foreach (var field in _fieldList)
             {
-                var args = argument.Split(' ');
-                if (args.Length != 2) { continue; }
-                var argumentName = args[1];
+                var (argumentType, argumentName, _) = getTypeAndNamesFromField(field);
+                if (string.IsNullOrEmpty(argumentType)) { continue; }
                 sb.AppendLine($"\t{ToPascal(argumentName)},");
             }
             sb.AppendLine($"");
@@ -264,12 +263,10 @@ namespace Nuruwo.Tool
         {
             var sb = new StringBuilder();
             sb.Append($"public static {pClassName} New(");
-            foreach (var argument in fieldList)
+            foreach (var field in fieldList)
             {
-                var args = argument.Split(' ');
-                if (args.Length != 2) { continue; }
-                var argumentType = args[0];
-                var argumentName = args[1];
+                var (argumentType, argumentName, _) = getTypeAndNamesFromField(field);
+                if (string.IsNullOrEmpty(argumentType)) { continue; }
                 sb.Append($"{argumentType} {argumentName}, ");
             }
             sb.Remove(sb.Length - 2, 2);    //remove last comma and space
@@ -279,12 +276,11 @@ namespace Nuruwo.Tool
             sb.AppendLine();
 
             var buffBase = $"\tbuff[(int)";
-            foreach (var argument in fieldList)
+            foreach (var field in fieldList)
             {
-                var args = argument.Split(' ');
-                if (args.Length != 2) { continue; }
-                var argumentName = args[1];
-                var pArgumentName = ToPascal(argumentName);
+                var (argumentType, argumentName, pArgumentName) = getTypeAndNamesFromField(field);
+                if (string.IsNullOrEmpty(argumentType)) { continue; }
+
                 sb.AppendLine($"{buffBase}{enumName}.{pArgumentName}] = {argumentName};");
             }
 
@@ -305,12 +301,10 @@ namespace Nuruwo.Tool
         private string GenerateGetMethods(string pClassName, string enumName, List<string> fieldList)
         {
             var sb = new StringBuilder();
-            foreach (var argument in fieldList)
+            foreach (var field in fieldList)
             {
-                var args = argument.Split(' ');
-                if (args.Length != 2) { continue; }
-                var argumentType = args[0];
-                var pArgumentName = ToPascal(args[1]);
+                var (argumentType, _, pArgumentName) = getTypeAndNamesFromField(field);
+                if (string.IsNullOrEmpty(argumentType)) { continue; }
 
                 sb.AppendLine($"public static {argumentType} {pArgumentName}(this {pClassName} instance)");
                 sb.AppendLine($"\t=> ({argumentType})((object[])(object)instance)[(int){enumName}.{pArgumentName}];");
@@ -321,12 +315,10 @@ namespace Nuruwo.Tool
         private string GenerateSetMethods(string pClassName, string enumName, List<string> fieldList)
         {
             var sb = new StringBuilder();
-            foreach (var argument in fieldList)
+            foreach (var field in fieldList)
             {
-                var args = argument.Split(' ');
-                if (args.Length != 2) { continue; }
-                var argumentType = args[0];
-                var pArgumentName = ToPascal(args[1]);
+                var (argumentType, _, pArgumentName) = getTypeAndNamesFromField(field);
+                if (string.IsNullOrEmpty(argumentType)) { continue; }
 
                 sb.AppendLine($"public static void {pArgumentName}(this {pClassName} instance, {argumentType} arg)");
                 sb.AppendLine($"\t=> ((object[])(object)instance)[(int){enumName}.{pArgumentName}] = arg;");
@@ -343,6 +335,16 @@ namespace Nuruwo.Tool
             }
             sb.Append("}");
             return sb.ToString();
+        }
+
+        private (string, string, string) getTypeAndNamesFromField(string field)
+        {
+            var args = Regex.Split(field.Trim(), @"\s+");
+            if (args.Length != 2) { return (string.Empty, string.Empty, string.Empty); }
+            var argumentType = args[0].Trim();
+            var argumentName = args[1].Trim();
+            var pArgumentName = ToPascal(argumentName);
+            return (argumentType, argumentName, pArgumentName);
         }
 
         /*------------------------------Load script---------------------------------*/
