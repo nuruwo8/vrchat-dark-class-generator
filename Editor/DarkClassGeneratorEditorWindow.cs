@@ -441,6 +441,8 @@ namespace Nuruwo.Tool
                     sb.Append($"{rightString}.Boolean;");
                     break;
                 case "char":
+                    sb.Append($"{rightString}.String[0];" + newLine);
+                    break;
                 case "string":
                     sb.Append($"{rightString}.String;" + newLine);
                     break;
