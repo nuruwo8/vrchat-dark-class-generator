@@ -1,9 +1,11 @@
 #if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using Mono.Cecil.Cil;
 using UnityEditor;
 using UnityEditorInternal;
 using UnityEngine;
@@ -386,6 +388,7 @@ namespace Nuruwo.Tool
                 var jsonField = JsonFieldDeclaration(field);
                 sb.AppendLine(jsonField);
             }
+            sb.AppendLine();
 
             //object 
             sb.Append(GenerateObjectAssign(pClassName, enumName, fieldList));
@@ -412,16 +415,28 @@ namespace Nuruwo.Tool
         private string GenerateJsonArrayField(string argumentType, string argumentName)
         {
             var sb = new StringBuilder();
+            var typeIsDarkClass = CheckTypeIsDarkClass(argumentType);
 
             var pureType = argumentType.Replace("[]", "");
+            var arrayName = typeIsDarkClass ? $"{argumentName}Objects" : argumentName;
+            var arrayType = typeIsDarkClass ? $"object" : pureType;
+
             sb.AppendLine($"\tvar {argumentName}List = dic[\"{argumentName}\"].DataList;");
             sb.AppendLine($"\tvar {argumentName}Count = {argumentName}List.Count;");
-            sb.AppendLine($"\tvar {argumentName} = new {pureType}[{argumentName}Count];");
+            sb.AppendLine($"\tvar {arrayName} = new {arrayType}[{argumentName}Count];");
 
             sb.AppendLine($"\tfor (int i = 0; i < {argumentName}Count; i++)");
             sb.AppendLine($"\t{{");
-            sb.Append(GetCastedTypeAndNameFromField(pureType, argumentName, true));
-            sb.AppendLine($"\t}}");
+            sb.AppendLine(GetCastedTypeAndNameFromField(pureType, argumentName, true));
+            if (typeIsDarkClass)
+            {
+                sb.AppendLine($"\t}}");
+                sb.Append($"\tvar {argumentName} = ({argumentType}){arrayName};");
+            }
+            else
+            {
+                sb.Append($"\t}}");
+            }
 
             return sb.ToString();
         }
@@ -429,10 +444,11 @@ namespace Nuruwo.Tool
         private string GetCastedTypeAndNameFromField(string argumentType, string argumentName, bool isArrayElement)
         {
             var sb = new StringBuilder();
+            var typeIsDarkClass = CheckTypeIsDarkClass(argumentType);
+            var objectString = isArrayElement && typeIsDarkClass ? "Objects" : "";
             var leftPreString = isArrayElement ? "\t\t" : "\tvar ";
             var leftPostString = isArrayElement ? "[i]" : "";
-            var newLine = isArrayElement ? "\r\n" : "";
-            sb.Append($"{leftPreString}{argumentName}{leftPostString} = ");
+            sb.Append($"{leftPreString}{argumentName}{objectString}{leftPostString} = ");
             var rightString = isArrayElement ? $"{argumentName}List[i]" : $"dic[\"{argumentName}\"]";
 
             switch (argumentType)
@@ -441,10 +457,10 @@ namespace Nuruwo.Tool
                     sb.Append($"{rightString}.Boolean;");
                     break;
                 case "char":
-                    sb.Append($"{rightString}.String[0];" + newLine);
+                    sb.Append($"{rightString}.String[0];");
                     break;
                 case "string":
-                    sb.Append($"{rightString}.String;" + newLine);
+                    sb.Append($"{rightString}.String;");
                     break;
                 case "byte":
                 case "sbyte":
@@ -457,7 +473,7 @@ namespace Nuruwo.Tool
                 case "ushort":
                 case "float":
                 case "double":
-                    sb.Append($"({argumentType}){rightString}.Number;" + newLine);
+                    sb.Append($"({argumentType}){rightString}.Number;");
                     break;
                 case "Vector2":
                 case "Vector3":
@@ -475,14 +491,33 @@ namespace Nuruwo.Tool
                 case "GraphicsFormat":
                 case "TextureFormat":
                     //enum
-                    sb.Append($"({argumentType})(int){rightString}.Number;" + newLine);
+                    sb.Append($"({argumentType})(int){rightString}.Number;");
                     break;
                 default:
                     //Dark class
-                    sb.Append($"({argumentType}){rightString}.New(dic[\"{argumentName}\"].DataDictionary);" + newLine);
+                    if (!isArrayElement)
+                    {
+                        sb.Append($"{argumentType}.New(dic[\"{argumentName}\"].DataDictionary);");
+                    }
+                    else
+                    {
+                        sb.Append($"{argumentType}.New({argumentName}List[i].DataDictionary);");
+                    }
                     break;
             }
             return sb.ToString();
+        }
+
+        private bool CheckTypeIsDarkClass(string argumentType)
+        {
+            var typeArray = new string[] {
+                "bool", "char", "string", "byte", "sbyte", "decimal", "int", "uint", "long",
+                "ulong", "short", "ushort", "float", "double", "Vector2", "Vector3", "Vector4",
+                "Quaternion", "Color", "Color32", "TrackingDataType", "HumanBodyBones",
+                "TextureWrapMode", "GraphicsFormat", "TextureFormat" };
+            var pureType = argumentType.Replace("[]", "");
+            var index = Array.IndexOf(typeArray, pureType);
+            return index == -1;
         }
 
         private string GenerateJsonColorField(string argumentType, string argumentName, bool isArrayElement)
