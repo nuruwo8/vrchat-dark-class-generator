@@ -37,7 +37,7 @@ namespace Nuruwo.Dev
 ```
 
 ## Load parameters from a DarkClass script file
-Open the fold as shown in the image and specify aDarkClass script to extract each parameter.
+Open the fold as shown in the image and specify a DarkClass script to extract each parameter.
 
 <kbd><img src="ReadMeImages/load_parameters.png" alt="" width="800"/></kbd><br><br>
 
