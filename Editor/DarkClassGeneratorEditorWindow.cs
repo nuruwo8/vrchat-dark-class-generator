@@ -14,7 +14,6 @@ namespace Nuruwo.Tool
     {
         /*------------------------------private values----------------------------------*/
         private bool _loadFoldIsOpen = false;
-        private bool _optionFoldIsOpen = false;
 
         private bool _generateSetMethod = true;
         private bool _jsonDeserializeMode = false;
@@ -93,24 +92,20 @@ namespace Nuruwo.Tool
             _reorderableList.DoLayoutList();
             EditorGUI.indentLevel--;
             EditorGUILayout.EndVertical();
-            EditorGUILayout.Space(10);
+            EditorGUILayout.Space(5);
 
             //options
             EditorGUILayout.BeginVertical(GUI.skin.box);
-            _optionFoldIsOpen = EditorGUILayout.Foldout(_optionFoldIsOpen, "Options");
-            if (_optionFoldIsOpen)
-            {
-                EditorGUI.indentLevel++;
-                GUILayout.Label("Generate Set methods");
-                _generateSetMethod = EditorGUILayout.Toggle(string.Empty, _generateSetMethod);
-                EditorGUILayout.Space(10);
-                GUILayout.Label("JSON deserialize mode (Experimental)");
-                _jsonDeserializeMode = EditorGUILayout.Toggle(string.Empty, _jsonDeserializeMode);
-                EditorGUILayout.Space(10);
-                EditorGUI.indentLevel--;
-            }
+            GUILayout.Label("Options");
+            EditorGUI.indentLevel++;
+            EditorGUILayout.Space(5);
+            _generateSetMethod = EditorGUILayout.ToggleLeft(" Generate Set methods", _generateSetMethod);
+            EditorGUILayout.Space(5);
+            _jsonDeserializeMode = EditorGUILayout.ToggleLeft(" JSON deserialize mode (Experimental)", _jsonDeserializeMode);
+            EditorGUILayout.Space(5);
+            EditorGUI.indentLevel--;
             EditorGUILayout.EndVertical();
-            EditorGUILayout.Space(10);
+            EditorGUILayout.Space(5);
 
             //Generate button
             var canGenerate = !string.IsNullOrEmpty(_className) && _fieldList.Count > 0 && !string.IsNullOrEmpty(_fieldList[0]);
