@@ -5,7 +5,7 @@ DarkClass is to make your custom UdonSharp class
 You can call up this tool by clicking <Tools/Nuruwo/DarkClassGenerator> in the Editor menu.
 As shown in the image, enter these items and press the button to generate the code.
 
-<kbd><img src="ReadMeImages/usage_example.png" alt="" width="800"/></kbd><br><br>
+<kbd><img src="ReadMeImages/usage_example.png" alt="" width="900"/></kbd><br><br>
 
 ## Usage generated DarkClass in your UdonSharp scripts
 Generated class can be used in other UdonSharp scripts as follows.
@@ -40,6 +40,12 @@ namespace Nuruwo.Dev
 Open the fold as shown in the image and specify a DarkClass script to extract each parameter.
 
 <kbd><img src="ReadMeImages/load_parameters.png" alt="" width="800"/></kbd><br><br>
+
+## JSON deserialize mode
+When optionally turned on, it generates the following code. Array and DarkClass nesting is also possible.
+
+<kbd><img src="ReadMeImages/json_generate.png" alt="" width="900"/></kbd><br><br>
+
 
 ## Reference
 See detail technical article
