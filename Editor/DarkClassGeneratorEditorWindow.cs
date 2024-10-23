@@ -165,7 +165,7 @@ namespace Nuruwo.Tool
             var nst = nameSpaceIsExist ? 1 : 0; //namespace tab number
 
             //enum
-            sb.Append(AddTabLines("// Enum for assigning index of field objects\r\n", nst));
+            sb.Append(AddTabLines("// Enum for assigning index of field DataTokens\r\n", nst));
             var enumString = GenerateEnum(enumName);
             sb.Append(AddTabLines(enumString, nst));
             sb.AppendLine();
@@ -288,7 +288,7 @@ namespace Nuruwo.Tool
             var sb = new StringBuilder();
 
             sb.AppendLine($"[AddComponentMenu(\"\")]");
-            sb.AppendLine($"public class {pClassName} : UdonSharpBehaviour");
+            sb.AppendLine($"public class {pClassName} : DataList");
             sb.AppendLine($"{{");
             return sb.ToString();
         }
@@ -307,8 +307,8 @@ namespace Nuruwo.Tool
             sb.AppendLine($")");
             sb.AppendLine($"{{");
 
-            //object 
-            sb.Append(GenerateObjectAssign(pClassName, enumName, fieldList));
+            //data token 
+            sb.Append(GenerateDataTokenAssign(pClassName, enumName, fieldList));
             return sb.ToString();
         }
 
@@ -328,10 +328,71 @@ namespace Nuruwo.Tool
                 var (argumentType, _, pArgumentName) = getTypeAndNamesFromField(field);
                 if (string.IsNullOrEmpty(argumentType)) { continue; }
 
+                var (dataTokenType, isCastRequired) = GetDataTokenTypeAndCastRequired(argumentType);
+                var cast = isCastRequired ? $"({argumentType})" : "";
+
                 sb.AppendLine($"public static {argumentType} {pArgumentName}(this {pClassName} instance)");
-                sb.AppendLine($"\t=> ({argumentType})((object[])(object)instance)[(int){enumName}.{pArgumentName}];");
+                sb.AppendLine($"\t=> {cast}instance[(int){enumName}.{pArgumentName}].{dataTokenType};");
             }
             return sb.ToString();
+        }
+
+        /// <summary>
+        /// get data token type and is cast required
+        /// </summary>
+        /// <param name="argumentType"></param>
+        /// <returns></returns>
+        private (string, bool) GetDataTokenTypeAndCastRequired(string argumentType)
+        {
+            if (Regex.IsMatch(argumentType, @"\[\s*\]"))
+            {
+                //array
+                return ("Reference", true);
+            }
+
+            //not array
+            switch (argumentType)
+            {
+                case "bool":
+                    return ("Boolean", false);
+                case "sbyte":
+                    return ("SByte", false);
+                case "byte":
+                    return ("Byte", false);
+                case "short":
+                    return ("Short", false);
+                case "ushort":
+                    return ("UShort", false);
+                case "int":
+                    return ("Int", false);
+                case "uint":
+                    return ("UInt", false);
+                case "long":
+                    return ("Long", false);
+                case "float":
+                    return ("Float", false);
+                case "double":
+                    return ("Double", false);
+                case "string":
+                    return ("String", false);
+                //enum
+                case "TrackingDataType":
+                case "HumanBodyBones":
+                case "TextureWrapMode":
+                case "GraphicsFormat":
+                case "TextureFormat":
+                //other
+                case "Vector2":
+                case "Vector3":
+                case "Vector4":
+                case "Quaternion":
+                case "Color":
+                case "Color32":
+                    return ("Reference", true);
+                default:
+                    //darkClass
+                    return ("DataList", true);
+            }
         }
 
         private string GenerateSetMethods(string pClassName, string enumName, List<string> fieldList)
@@ -343,7 +404,7 @@ namespace Nuruwo.Tool
                 if (string.IsNullOrEmpty(argumentType)) { continue; }
 
                 sb.AppendLine($"public static void {pArgumentName}(this {pClassName} instance, {argumentType} arg)");
-                sb.AppendLine($"\t=> ((object[])(object)instance)[(int){enumName}.{pArgumentName}] = arg;");
+                sb.AppendLine($"\t=> instance[(int){enumName}.{pArgumentName}] = new DataToken(arg);");
             }
             return sb.ToString();
         }
@@ -384,13 +445,13 @@ namespace Nuruwo.Tool
             sb.AppendLine();
 
             //object 
-            sb.Append(GenerateObjectAssign(pClassName, enumName, fieldList));
+            sb.Append(GenerateDataTokenAssign(pClassName, enumName, fieldList));
             return sb.ToString();
         }
 
         private string JsonFieldDeclaration(string field)
         {
-            var (argumentType, argumentName, pArgumentName) = getTypeAndNamesFromField(field);
+            var (argumentType, argumentName, _) = getTypeAndNamesFromField(field);
             if (string.IsNullOrEmpty(argumentType)) { return string.Empty; }
 
             //type of arrays (List is not supported)
@@ -408,28 +469,18 @@ namespace Nuruwo.Tool
         private string GenerateJsonArrayField(string argumentType, string argumentName)
         {
             var sb = new StringBuilder();
-            var typeIsDarkClass = CheckTypeIsDarkClass(argumentType);
 
             var pureType = argumentType.Replace("[]", "");
-            var arrayName = typeIsDarkClass ? $"{argumentName}Objects" : argumentName;
-            var arrayType = typeIsDarkClass ? $"object" : pureType;
 
             sb.AppendLine($"\tvar {argumentName}List = dic[\"{argumentName}\"].DataList;");
             sb.AppendLine($"\tvar {argumentName}Count = {argumentName}List.Count;");
-            sb.AppendLine($"\tvar {arrayName} = new {arrayType}[{argumentName}Count];");
+            sb.AppendLine($"\tvar {argumentName} = new {pureType}[{argumentName}Count];");
 
             sb.AppendLine($"\tfor (int i = 0; i < {argumentName}Count; i++)");
             sb.AppendLine($"\t{{");
             sb.AppendLine(GetCastedTypeAndNameFromField(pureType, argumentName, true));
-            if (typeIsDarkClass)
-            {
-                sb.AppendLine($"\t}}");
-                sb.Append($"\tvar {argumentName} = ({argumentType}){arrayName};");
-            }
-            else
-            {
-                sb.Append($"\t}}");
-            }
+
+            sb.Append($"\t}}");
 
             return sb.ToString();
         }
@@ -437,11 +488,9 @@ namespace Nuruwo.Tool
         private string GetCastedTypeAndNameFromField(string argumentType, string argumentName, bool isArrayElement)
         {
             var sb = new StringBuilder();
-            var typeIsDarkClass = CheckTypeIsDarkClass(argumentType);
-            var objectString = isArrayElement && typeIsDarkClass ? "Objects" : "";
             var leftPreString = isArrayElement ? "\t\t" : "\tvar ";
             var leftPostString = isArrayElement ? "[i]" : "";
-            sb.Append($"{leftPreString}{argumentName}{objectString}{leftPostString} = ");
+            sb.Append($"{leftPreString}{argumentName}{leftPostString} = ");
             var rightString = isArrayElement ? $"{argumentName}List[i]" : $"dic[\"{argumentName}\"]";
 
             switch (argumentType)
@@ -499,18 +548,6 @@ namespace Nuruwo.Tool
                     break;
             }
             return sb.ToString();
-        }
-
-        private bool CheckTypeIsDarkClass(string argumentType)
-        {
-            var typeArray = new string[] {
-                "bool", "char", "string", "byte", "sbyte", "decimal", "int", "uint", "long",
-                "ulong", "short", "ushort", "float", "double", "Vector2", "Vector3", "Vector4",
-                "Quaternion", "Color", "Color32", "TrackingDataType", "HumanBodyBones",
-                "TextureWrapMode", "GraphicsFormat", "TextureFormat" };
-            var pureType = argumentType.Replace("[]", "");
-            var index = Array.IndexOf(typeArray, pureType);
-            return index == -1;
         }
 
         private string GenerateJsonColorField(string argumentType, string argumentName, bool isArrayElement)
@@ -578,26 +615,26 @@ namespace Nuruwo.Tool
         /*------------------------------Utility----------------------------------*/
 
 
-        private string GenerateObjectAssign(string pClassName, string enumName, List<string> fieldList)
+        private string GenerateDataTokenAssign(string pClassName, string enumName, List<string> fieldList)
         {
             var sb = new StringBuilder();
 
-            //object 
-            sb.AppendLine($"\t// Make objects");
-            sb.AppendLine($"\tvar buff = new object[(int){enumName}.Count];");
+            //data token 
+            sb.AppendLine($"\t// Make DataTokens");
+            sb.AppendLine($"\tvar data = new DataToken[(int){enumName}.Count];");
             sb.AppendLine();
 
-            var buffBase = $"\tbuff[(int)";
+            var dataBase = $"\tdata[(int)";
             foreach (var field in fieldList)
             {
                 var (argumentType, argumentName, pArgumentName) = getTypeAndNamesFromField(field);
                 if (string.IsNullOrEmpty(argumentType)) { continue; }
 
-                sb.AppendLine($"{buffBase}{enumName}.{pArgumentName}] = {argumentName};");
+                sb.AppendLine($"{dataBase}{enumName}.{pArgumentName}] = new DataToken({argumentName});");
             }
 
             sb.AppendLine();
-            sb.AppendLine($"\treturn ({pClassName})(object)buff;");
+            sb.AppendLine($"\treturn ({pClassName})new DataList(data);");
             sb.AppendLine($"}}");
             return sb.ToString();
         }
