@@ -46,7 +46,12 @@ When optionally turned on, it generates the following code. Array and DarkClass 
 
 <kbd><img src="ReadMeImages/json_generate.png" alt="" width="900"/></kbd><br><br>
 
+# Update
+In V2.0. Improved to DataList version.This was inspired by this code. Thanks 
+TheHelpfulHelper!</br>
+https://gist.github.com/TheHelpfulHelper/e94c44764e1bf9e73d24e52f2983431d
+
 
 ## Reference
-See detail technical article
+See detail technical article</br>
 https://power-of-tech.hatenablog.com/entry/2024/06/12/191828
