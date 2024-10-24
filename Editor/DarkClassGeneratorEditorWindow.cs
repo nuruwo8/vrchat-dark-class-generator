@@ -14,6 +14,7 @@ namespace Nuruwo.Tool
     {
         /*------------------------------private values----------------------------------*/
         private bool _loadFoldIsOpen = false;
+        private bool _enumFoldIsOpen = false;
 
         private bool _generateSetMethod = true;
         private bool _jsonDeserializeMode = false;
@@ -21,10 +22,12 @@ namespace Nuruwo.Tool
 
         private TextAsset _textAsset;
         private string _prevScriptName = string.Empty;
-        private ReorderableList _reorderableList;
+        private ReorderableList _reorderableFieldList;
+        private ReorderableList _reorderableEnumList;
         private string _className = string.Empty;
         private string _nameSpace = string.Empty;
         private List<string> _fieldList = new List<string>() { "int value" };
+        private List<string> _enumList = new List<string>() { "UserEnum" };
         private string _result = string.Empty;
         private string _generatedCode = string.Empty;
         private Vector2 _scrollPosition = Vector2.zero; //for textArea scroll
@@ -38,7 +41,8 @@ namespace Nuruwo.Tool
 
         private void OnEnable()
         {
-            UpdateReorderableList(_fieldList);
+            UpdateReorderableFieldList(_fieldList);
+            UpdateReorderableEnumList(_enumList);
         }
 
         /*------------------------------UI Look---------------------------------*/
@@ -90,26 +94,37 @@ namespace Nuruwo.Tool
             EditorGUILayout.Space(10);
 
             //Augment list
-            _reorderableList.DoLayoutList();
+            _reorderableFieldList.DoLayoutList();
             EditorGUI.indentLevel--;
             EditorGUILayout.EndVertical();
             EditorGUILayout.Space(5);
 
             //options
-            EditorGUILayout.BeginVertical(GUI.skin.box);
-            GUILayout.Label("Options");
-            EditorGUI.indentLevel++;
-            EditorGUILayout.Space(5);
-            _generateSetMethod = EditorGUILayout.ToggleLeft(" Generate Set methods", _generateSetMethod);
-            EditorGUILayout.Space(5);
-            _jsonDeserializeMode = EditorGUILayout.ToggleLeft(" JSON deserialize mode (Experimental)", _jsonDeserializeMode);
-            EditorGUILayout.Space(5);
-            EditorGUILayout.Space(5);
-            _vectorOrColorAsDataList = EditorGUILayout.ToggleLeft(" Vector or Color as DataList", _vectorOrColorAsDataList);
-            EditorGUILayout.Space(5);
-            EditorGUI.indentLevel--;
-            EditorGUILayout.EndVertical();
-            EditorGUILayout.Space(5);
+            {
+                EditorGUILayout.BeginVertical(GUI.skin.box);
+                GUILayout.Label("Options");
+                EditorGUI.indentLevel++;
+                EditorGUILayout.Space(5);
+                _generateSetMethod = EditorGUILayout.ToggleLeft(" Generate Set methods", _generateSetMethod);
+                EditorGUILayout.Space(5);
+                _jsonDeserializeMode = EditorGUILayout.ToggleLeft(" JSON deserialize mode (Experimental)", _jsonDeserializeMode);
+                EditorGUILayout.Space(5);
+                EditorGUILayout.Space(5);
+                _vectorOrColorAsDataList = EditorGUILayout.ToggleLeft(" Vector or Color as DataList", _vectorOrColorAsDataList);
+                EditorGUILayout.Space(5);
+
+                //custom enum
+                _enumFoldIsOpen = EditorGUILayout.Foldout(_enumFoldIsOpen, "Set user enum list");
+                if (_enumFoldIsOpen)
+                {
+                    //Augment list
+                    _reorderableEnumList.DoLayoutList();
+                }
+
+                EditorGUI.indentLevel--;
+                EditorGUILayout.EndVertical();
+                EditorGUILayout.Space(5);
+            }
 
             //Generate button
             var canGenerate = !string.IsNullOrEmpty(_className) && _fieldList.Count > 0 && !string.IsNullOrEmpty(_fieldList[0]);
@@ -137,10 +152,10 @@ namespace Nuruwo.Tool
             EditorGUILayout.EndScrollView();
         }
 
-        private void UpdateReorderableList(List<string> list)
+        private void UpdateReorderableFieldList(List<string> list)
         {
             _fieldList = list;
-            _reorderableList = new ReorderableList(
+            _reorderableFieldList = new ReorderableList(
               elements: _fieldList,
               elementType: typeof(string),
               draggable: true,
@@ -148,14 +163,32 @@ namespace Nuruwo.Tool
               displayAddButton: true,
               displayRemoveButton: true
             );
-            _reorderableList.drawHeaderCallback = rect => EditorGUI.LabelField(rect, "Field List");
-            _reorderableList.elementHeightCallback = index => 20;
-            _reorderableList.drawElementCallback = (rect, index, isActive, isFocused) =>
+            _reorderableFieldList.drawHeaderCallback = rect => EditorGUI.LabelField(rect, "Field List");
+            _reorderableFieldList.elementHeightCallback = index => 20;
+            _reorderableFieldList.drawElementCallback = (rect, index, isActive, isFocused) =>
             {
-                _fieldList[index] = EditorGUI.TextField(rect, "  Field " + index, _fieldList[index]);
+                _fieldList[index] = EditorGUI.TextField(rect, "  Field (type and name) " + index, _fieldList[index]);
             };
         }
 
+        private void UpdateReorderableEnumList(List<string> list)
+        {
+            _enumList = list;
+            _reorderableEnumList = new ReorderableList(
+              elements: _enumList,
+              elementType: typeof(string),
+              draggable: true,
+              displayHeader: true,
+              displayAddButton: true,
+              displayRemoveButton: true
+            );
+            _reorderableEnumList.drawHeaderCallback = rect => EditorGUI.LabelField(rect, "Enum List");
+            _reorderableEnumList.elementHeightCallback = index => 20;
+            _reorderableEnumList.drawElementCallback = (rect, index, isActive, isFocused) =>
+            {
+                _enumList[index] = EditorGUI.TextField(rect, "  Enum type " + index, _enumList[index]);
+            };
+        }
         /*------------------------------Generate DarkClass-----------------------------*/
 
         private string GenerateDarkClass(bool generateSetMethod)
@@ -380,6 +413,13 @@ namespace Nuruwo.Tool
 
         private bool CheckDataTokenTypeIsReference(string argumentType)
         {
+            var typeIsEnum = _enumList.ToArray().Contains(argumentType);
+            if (typeIsEnum)
+            {
+                //user enum type is Reference
+                return true;
+            }
+
             if (Regex.IsMatch(argumentType, @"\[\s*\]"))
             {
                 //array is reference
@@ -446,6 +486,7 @@ namespace Nuruwo.Tool
 
             var pureType = argumentType.Replace("[]", "");
 
+            sb.AppendLine();    //For readability
             sb.AppendLine($"\tvar {argumentName}List = dic[\"{argumentName}\"].DataList;");
             sb.AppendLine($"\tvar {argumentName}Count = {argumentName}List.Count;");
             sb.AppendLine($"\tvar {argumentName} = new {pureType}[{argumentName}Count];");
@@ -483,6 +524,16 @@ namespace Nuruwo.Tool
             sb.Append($"{leftPreString}{argumentName}{leftPostString} = ");
             var rightString = isArrayElement ? $"{argumentName}List[i]" : $"dic[\"{argumentName}\"]";
 
+            //check option Enum
+            var typeIsEnum = _enumList.ToArray().Contains(argumentType);
+            if (typeIsEnum)
+            {
+                //custom enum
+                sb.Append($"({argumentType})(int){rightString}.Number;");
+                return sb.ToString();
+            }
+
+            //switch with arg type
             switch (argumentType)
             {
                 case "bool":
@@ -512,7 +563,7 @@ namespace Nuruwo.Tool
                 case "TextureWrapMode":
                 case "GraphicsFormat":
                 case "TextureFormat":
-                    //enum
+                    //normal enum
                     sb.Append($"({argumentType})(int){rightString}.Number;");
                     break;
                 default:
@@ -547,6 +598,10 @@ namespace Nuruwo.Tool
             }
 
             var sb = new StringBuilder();
+            if (!isArrayElement)
+            {
+                sb.AppendLine();    //For readability
+            }
             var tab = isArrayElement ? $"\t\t" : $"\t";
             var arrayElement = isArrayElement ? $"[i]" : $"";
             var argNameString = isArrayElement ? $"{argumentName}List[i]" : $"dic[\"{argumentName}\"]";
@@ -570,7 +625,7 @@ namespace Nuruwo.Tool
                 sb.Append($"{elementName}");
                 if (i < elementNum - 1) { sb.Append(", "); }    //except last
             }
-            sb.AppendLine($");");
+            sb.Append($");");
 
             return sb.ToString();
         }
@@ -599,6 +654,10 @@ namespace Nuruwo.Tool
             }
 
             var sb = new StringBuilder();
+            if (!isArrayElement)
+            {
+                sb.AppendLine();    //For readability
+            }
             var tab = isArrayElement ? $"\t\t" : $"\t";
             var arrayElement = isArrayElement ? $"[i]" : $"";
             var argNameString = isArrayElement ? $"{argumentName}List[i]" : $"dic[\"{argumentName}\"]";
@@ -622,14 +681,12 @@ namespace Nuruwo.Tool
                 sb.Append($"{elementName}");
                 if (i < elementNum - 1) { sb.Append(", "); }    //except last
             }
-            sb.AppendLine($");");
+            sb.Append($");");
 
             return sb.ToString();
         }
 
         /*------------------------------Utility----------------------------------*/
-
-
         private string GenerateDataTokenAssign(string pClassName, string enumName, List<string> fieldList)
         {
             var sb = new StringBuilder();
@@ -672,7 +729,7 @@ namespace Nuruwo.Tool
             if (!string.IsNullOrEmpty(_className))
             {
                 var fieldStrings = ExtractFields(oneLineText, _className);
-                if (fieldStrings.Count > 0) { UpdateReorderableList(fieldStrings); }
+                if (fieldStrings.Count > 0) { UpdateReorderableFieldList(fieldStrings); }
             }
         }
 

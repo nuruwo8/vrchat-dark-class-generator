@@ -46,6 +46,12 @@ When optionally turned on, it generates the following code. Array and DarkClass 
 
 <kbd><img src="ReadMeImages/json_generate.png" alt="" width="900"/></kbd><br><br>
 
+## Enum
+If you use an enum that is not registered (or your own enum), you will get errors in editor.<br>
+To avoid errors, generate the enum by specifying the enum type in the options, as shown in the image.
+
+<kbd><img src="ReadMeImages/customEnum.png" alt="" width="900"/></kbd><br><br>
+
 ## Update
 In V2.0. Improved to DataList version.This was inspired by this code. Thanks 
 TheHelpfulHelper!</br>
