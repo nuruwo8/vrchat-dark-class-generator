@@ -220,7 +220,7 @@ namespace Nuruwo.Tool
             sb.Append($"// public static {pClassName} New(");
             foreach (var field in fieldList)
             {
-                var (argumentType, argumentName, _) = getTypeAndNamesFromField(field);
+                var (argumentType, argumentName, _) = GetTypeAndNamesFromField(field);
                 if (string.IsNullOrEmpty(argumentType)) { continue; }
                 sb.Append($"{argumentType} {argumentName}, ");
             }
@@ -254,7 +254,6 @@ namespace Nuruwo.Tool
         private string GenerateHeaderWithNameSpace(string nameSpace)
         {
             var sb = new StringBuilder();
-            sb.AppendLine($"using UdonSharp;");
             sb.AppendLine($"using UnityEngine;");
             sb.AppendLine($"using VRC.SDK3.Data;");
             sb.AppendLine("");
@@ -273,7 +272,7 @@ namespace Nuruwo.Tool
             sb.AppendLine($"{{");
             foreach (var field in _fieldList)
             {
-                var (argumentType, _, pArgumentName) = getTypeAndNamesFromField(field);
+                var (argumentType, _, pArgumentName) = GetTypeAndNamesFromField(field);
                 if (string.IsNullOrEmpty(argumentType)) { continue; }
                 sb.AppendLine($"\t{pArgumentName},");
             }
@@ -299,7 +298,7 @@ namespace Nuruwo.Tool
             sb.Append($"public static {pClassName} New(");
             foreach (var field in fieldList)
             {
-                var (argumentType, argumentName, _) = getTypeAndNamesFromField(field);
+                var (argumentType, argumentName, _) = GetTypeAndNamesFromField(field);
                 if (string.IsNullOrEmpty(argumentType)) { continue; }
                 sb.Append($"{argumentType} {argumentName}, ");
             }
@@ -325,74 +324,16 @@ namespace Nuruwo.Tool
             var sb = new StringBuilder();
             foreach (var field in fieldList)
             {
-                var (argumentType, _, pArgumentName) = getTypeAndNamesFromField(field);
+                var (argumentType, _, pArgumentName) = GetTypeAndNamesFromField(field);
                 if (string.IsNullOrEmpty(argumentType)) { continue; }
 
-                var (dataTokenType, isCastRequired) = GetDataTokenTypeAndCastRequired(argumentType);
-                var cast = isCastRequired ? $"({argumentType})" : "";
+                var typeIsReference = CheckDataTokenTypeIsReference(argumentType);
+                var dataTokenType = typeIsReference ? $".Reference" : $"";
 
                 sb.AppendLine($"public static {argumentType} {pArgumentName}(this {pClassName} instance)");
-                sb.AppendLine($"\t=> {cast}instance[(int){enumName}.{pArgumentName}].{dataTokenType};");
+                sb.AppendLine($"\t=> ({argumentType})instance[(int){enumName}.{pArgumentName}]{dataTokenType};");
             }
             return sb.ToString();
-        }
-
-        /// <summary>
-        /// get data token type and is cast required
-        /// </summary>
-        /// <param name="argumentType"></param>
-        /// <returns></returns>
-        private (string, bool) GetDataTokenTypeAndCastRequired(string argumentType)
-        {
-            if (Regex.IsMatch(argumentType, @"\[\s*\]"))
-            {
-                //array
-                return ("Reference", true);
-            }
-
-            //not array
-            switch (argumentType)
-            {
-                case "bool":
-                    return ("Boolean", false);
-                case "sbyte":
-                    return ("SByte", false);
-                case "byte":
-                    return ("Byte", false);
-                case "short":
-                    return ("Short", false);
-                case "ushort":
-                    return ("UShort", false);
-                case "int":
-                    return ("Int", false);
-                case "uint":
-                    return ("UInt", false);
-                case "long":
-                    return ("Long", false);
-                case "float":
-                    return ("Float", false);
-                case "double":
-                    return ("Double", false);
-                case "string":
-                    return ("String", false);
-                //enum
-                case "TrackingDataType":
-                case "HumanBodyBones":
-                case "TextureWrapMode":
-                case "GraphicsFormat":
-                case "TextureFormat":
-                //other
-                case "Vector2":
-                case "Vector3":
-                case "Vector4":
-                case "Quaternion":
-                case "Color":
-                case "Color32":
-                    return ("Reference", true);
-                default:
-                    //darkClass
-                    return ("DataList", true);
-            }
         }
 
         private string GenerateSetMethods(string pClassName, string enumName, List<string> fieldList)
@@ -400,11 +341,14 @@ namespace Nuruwo.Tool
             var sb = new StringBuilder();
             foreach (var field in fieldList)
             {
-                var (argumentType, _, pArgumentName) = getTypeAndNamesFromField(field);
+                var (argumentType, _, pArgumentName) = GetTypeAndNamesFromField(field);
                 if (string.IsNullOrEmpty(argumentType)) { continue; }
 
+                var typeIsReference = CheckDataTokenTypeIsReference(argumentType);
+                var arg = typeIsReference ? $"new DataToken(arg)" : $"arg";
+
                 sb.AppendLine($"public static void {pArgumentName}(this {pClassName} instance, {argumentType} arg)");
-                sb.AppendLine($"\t=> instance[(int){enumName}.{pArgumentName}] = new DataToken(arg);");
+                sb.AppendLine($"\t=> instance[(int){enumName}.{pArgumentName}] = {arg};");
             }
             return sb.ToString();
         }
@@ -420,7 +364,7 @@ namespace Nuruwo.Tool
             return sb.ToString();
         }
 
-        private (string, string, string) getTypeAndNamesFromField(string field)
+        private (string, string, string) GetTypeAndNamesFromField(string field)
         {
             var args = Regex.Split(field.Trim(), @"\s+");
             if (args.Length != 2) { return (string.Empty, string.Empty, string.Empty); }
@@ -428,6 +372,32 @@ namespace Nuruwo.Tool
             var argumentName = args[1].Trim();
             var pArgumentName = ToPascal(argumentName);
             return (argumentType, argumentName, pArgumentName);
+        }
+
+        private bool CheckDataTokenTypeIsReference(string argumentType)
+        {
+            if (Regex.IsMatch(argumentType, @"\[\s*\]"))
+            {
+                //array is reference
+                return true;
+            }
+
+            //You can add more types
+            var referenceCastTypes = new string[]{
+                "TrackingDataType",
+                "HumanBodyBones",
+                "TextureWrapMode",
+                "GraphicsFormat",
+                "TextureFormat",
+                "Vector2",
+                "Vector3",
+                "Vector4",
+                "Quaternion",
+                "Color",
+                "Color32",
+            };
+
+            return Array.IndexOf(referenceCastTypes, argumentType) != -1;   //if type is find in array. return true;
         }
 
         /*------------------------------Generate JSON Part Code-----------------------------*/
@@ -451,7 +421,7 @@ namespace Nuruwo.Tool
 
         private string JsonFieldDeclaration(string field)
         {
-            var (argumentType, argumentName, _) = getTypeAndNamesFromField(field);
+            var (argumentType, argumentName, _) = GetTypeAndNamesFromField(field);
             if (string.IsNullOrEmpty(argumentType)) { return string.Empty; }
 
             //type of arrays (List is not supported)
@@ -627,10 +597,13 @@ namespace Nuruwo.Tool
             var dataBase = $"\tdata[(int)";
             foreach (var field in fieldList)
             {
-                var (argumentType, argumentName, pArgumentName) = getTypeAndNamesFromField(field);
+                var (argumentType, argumentName, pArgumentName) = GetTypeAndNamesFromField(field);
                 if (string.IsNullOrEmpty(argumentType)) { continue; }
 
-                sb.AppendLine($"{dataBase}{enumName}.{pArgumentName}] = new DataToken({argumentName});");
+                var typeIsReference = CheckDataTokenTypeIsReference(argumentType);
+                var arg = typeIsReference ? $"new DataToken({argumentName})" : $"{argumentName}";
+
+                sb.AppendLine($"{dataBase}{enumName}.{pArgumentName}] = {arg};");
             }
 
             sb.AppendLine();
