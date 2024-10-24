@@ -17,6 +17,7 @@ namespace Nuruwo.Tool
 
         private bool _generateSetMethod = true;
         private bool _jsonDeserializeMode = false;
+        private bool _vectorOrColorAsDataList = false;
 
         private TextAsset _textAsset;
         private string _prevScriptName = string.Empty;
@@ -102,6 +103,9 @@ namespace Nuruwo.Tool
             _generateSetMethod = EditorGUILayout.ToggleLeft(" Generate Set methods", _generateSetMethod);
             EditorGUILayout.Space(5);
             _jsonDeserializeMode = EditorGUILayout.ToggleLeft(" JSON deserialize mode (Experimental)", _jsonDeserializeMode);
+            EditorGUILayout.Space(5);
+            EditorGUILayout.Space(5);
+            _vectorOrColorAsDataList = EditorGUILayout.ToggleLeft(" Vector or Color as DataList", _vectorOrColorAsDataList);
             EditorGUILayout.Space(5);
             EditorGUI.indentLevel--;
             EditorGUILayout.EndVertical();
@@ -457,7 +461,23 @@ namespace Nuruwo.Tool
 
         private string GetCastedTypeAndNameFromField(string argumentType, string argumentName, bool isArrayElement)
         {
+            //first. process Vector or Color
+            switch (argumentType)
+            {
+
+                case "Vector2":
+                case "Vector3":
+                case "Vector4":
+                case "Quaternion":
+                    return GenerateJsonVectorField(argumentType, argumentName, isArrayElement);
+                case "Color":
+                case "Color32":
+                    return GenerateJsonColorField(argumentType, argumentName, isArrayElement);
+            }
+
+            //second. other process.
             var sb = new StringBuilder();
+
             var leftPreString = isArrayElement ? "\t\t" : "\tvar ";
             var leftPostString = isArrayElement ? "[i]" : "";
             sb.Append($"{leftPreString}{argumentName}{leftPostString} = ");
@@ -487,16 +507,6 @@ namespace Nuruwo.Tool
                 case "double":
                     sb.Append($"({argumentType}){rightString}.Number;");
                     break;
-                case "Vector2":
-                case "Vector3":
-                case "Vector4":
-                case "Quaternion":
-                    sb.Append(GenerateJsonVectorField(argumentType, argumentName, isArrayElement));
-                    break;
-                case "Color":
-                case "Color32":
-                    sb.Append(GenerateJsonColorField(argumentType, argumentName, isArrayElement));
-                    break;
                 case "TrackingDataType":
                 case "HumanBodyBones":
                 case "TextureWrapMode":
@@ -522,63 +532,98 @@ namespace Nuruwo.Tool
 
         private string GenerateJsonColorField(string argumentType, string argumentName, bool isArrayElement)
         {
-            var sb = new StringBuilder();
+            var elementStrings = new string[] { "r", "g", "b", "a" };
+            var elementNameStrings = new string[] { "R", "G", "B", "A" };
+            var elementNum = elementStrings.Length;
+
             var cast = string.Empty;
             if (argumentType == "Color")
             {
-                sb.AppendLine($"new Color();");
                 cast = "(float)";
             }
             else if (argumentType == "Color32")
             {
-                sb.AppendLine($"new Color32();");
                 cast = "(byte)";
             }
 
+            var sb = new StringBuilder();
             var tab = isArrayElement ? $"\t\t" : $"\t";
             var arrayElement = isArrayElement ? $"[i]" : $"";
-            var elementRightString = isArrayElement ? $"{argumentName}List[i]" : $"dic[\"{argumentName}\"]";
-            sb.AppendLine($"{tab}var {argumentName}Dic = {elementRightString}.DataDictionary;");
+            var argNameString = isArrayElement ? $"{argumentName}List[i]" : $"dic[\"{argumentName}\"]";
+            var varRightString = _vectorOrColorAsDataList ? $"{argNameString}.DataList;" : $"{argNameString}.DataDictionary;";
+            var dataName = $"{argumentName}Data";
+            sb.AppendLine($"{tab}var {dataName} = {varRightString}");
 
-            sb.AppendLine($"{tab}{argumentName}{arrayElement}.r = {cast}{argumentName}Dic[\"r\"].Number;");
-            sb.AppendLine($"{tab}{argumentName}{arrayElement}.g = {cast}{argumentName}Dic[\"g\"].Number;");
-            sb.AppendLine($"{tab}{argumentName}{arrayElement}.b = {cast}{argumentName}Dic[\"b\"].Number;");
-            sb.AppendLine($"{tab}{argumentName}{arrayElement}.a = {cast}{argumentName}Dic[\"a\"].Number;");
+            for (int i = 0; i < elementNum; i++)
+            {
+                var elementName = argumentName + elementNameStrings[i];
+                var elementTarget = _vectorOrColorAsDataList ? $"[{i}]" : $"[\"{elementStrings[i]}\"]";
+                sb.AppendLine($"{tab}var {elementName} = {cast}{dataName}{elementTarget}.Number;");
+            }
+
+            //constructor
+            var varString = isArrayElement ? $"" : $"var ";
+            sb.Append($"{tab}{varString}{argumentName}{arrayElement} = new {argumentType}(");
+            for (int i = 0; i < elementNum; i++)
+            {
+                var elementName = argumentName + elementNameStrings[i];
+                sb.Append($"{elementName}");
+                if (i < elementNum - 1) { sb.Append(", "); }    //except last
+            }
+            sb.AppendLine($");");
+
             return sb.ToString();
         }
 
-
         private string GenerateJsonVectorField(string argumentType, string argumentName, bool isArrayElement)
         {
-            var sb = new StringBuilder();
+            var elementStrings = new string[] { "x", "y", "z", "w" };
+            var elementNameStrings = new string[] { "X", "Y", "Z", "W" };
+
+            var elementNum = 0;
             if (argumentType == "Vector2")
             {
-                sb.AppendLine($"new Vector2();");
+                elementNum = 2;
             }
             else if (argumentType == "Vector3")
             {
-                sb.AppendLine($"new Vector3();");
+                elementNum = 3;
             }
             else if (argumentType == "Vector4")
             {
-                sb.AppendLine($"new Vector4();");
+                elementNum = 4;
             }
             else if (argumentType == "Quaternion")
             {
-                sb.AppendLine($"new Quaternion();");
+                elementNum = 4;
             }
 
+            var sb = new StringBuilder();
             var tab = isArrayElement ? $"\t\t" : $"\t";
             var arrayElement = isArrayElement ? $"[i]" : $"";
-            var elementRightString = isArrayElement ? $"{argumentName}List[i]" : $"dic[\"{argumentName}\"]";
-            sb.AppendLine($"{tab}var {argumentName}Dic = {elementRightString}.DataDictionary;");
+            var argNameString = isArrayElement ? $"{argumentName}List[i]" : $"dic[\"{argumentName}\"]";
+            var varRightString = _vectorOrColorAsDataList ? $"{argNameString}.DataList;" : $"{argNameString}.DataDictionary;";
+            var dataName = $"{argumentName}Data";
+            sb.AppendLine($"{tab}var {dataName} = {varRightString}");
 
-            sb.AppendLine($"{tab}{argumentName}{arrayElement}.x = (float){argumentName}Dic[\"x\"].Number;");
-            sb.AppendLine($"{tab}{argumentName}{arrayElement}.y = (float){argumentName}Dic[\"y\"].Number;");
-            if (argumentType == "Vector2") { return sb.ToString(); }
-            sb.AppendLine($"{tab}{argumentName}{arrayElement}.z = (float){argumentName}Dic[\"z\"].Number;");
-            if (argumentType == "Vector3") { return sb.ToString(); }
-            sb.AppendLine($"{tab}{argumentName}{arrayElement}.w = (float){argumentName}Dic[\"w\"].Number;");
+            for (int i = 0; i < elementNum; i++)
+            {
+                var elementName = argumentName + elementNameStrings[i];
+                var elementTarget = _vectorOrColorAsDataList ? $"[{i}]" : $"[\"{elementStrings[i]}\"]";
+                sb.AppendLine($"{tab}var {elementName} = (float){dataName}{elementTarget}.Number;");
+            }
+
+            //constructor
+            var varString = isArrayElement ? $"" : $"var ";
+            sb.Append($"{tab}{varString}{argumentName}{arrayElement} = new {argumentType}(");
+            for (int i = 0; i < elementNum; i++)
+            {
+                var elementName = argumentName + elementNameStrings[i];
+                sb.Append($"{elementName}");
+                if (i < elementNum - 1) { sb.Append(", "); }    //except last
+            }
+            sb.AppendLine($");");
+
             return sb.ToString();
         }
 
