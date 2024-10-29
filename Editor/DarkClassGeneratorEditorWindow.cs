@@ -257,9 +257,16 @@ namespace Nuruwo.Tool
             sb.Append($"// public static {pClassName} New(");
             foreach (var field in fieldList)
             {
-                var (argumentType, argumentName, _) = GetTypeAndNamesFromField(field);
+                var (argumentType, argumentName, _, jsonKey) = GetTypeAndNamesFromField(field);
                 if (string.IsNullOrEmpty(argumentType)) { continue; }
-                sb.Append($"{argumentType} {argumentName}, ");
+                if (!string.IsNullOrEmpty(jsonKey))
+                {
+                    sb.Append($"{argumentType} {argumentName} {jsonKey}, ");
+                }
+                else
+                {
+                    sb.Append($"{argumentType} {argumentName}, ");
+                }
             }
             sb.Remove(sb.Length - 2, 2);    //remove last comma and space
             sb.AppendLine($")");
@@ -309,7 +316,7 @@ namespace Nuruwo.Tool
             sb.AppendLine($"{{");
             foreach (var field in _fieldList)
             {
-                var (argumentType, _, pArgumentName) = GetTypeAndNamesFromField(field);
+                var (argumentType, _, pArgumentName, _) = GetTypeAndNamesFromField(field);
                 if (string.IsNullOrEmpty(argumentType)) { continue; }
                 sb.AppendLine($"\t{pArgumentName},");
             }
@@ -335,7 +342,7 @@ namespace Nuruwo.Tool
             sb.Append($"public static {pClassName} New(");
             foreach (var field in fieldList)
             {
-                var (argumentType, argumentName, _) = GetTypeAndNamesFromField(field);
+                var (argumentType, argumentName, _, _) = GetTypeAndNamesFromField(field);
                 if (string.IsNullOrEmpty(argumentType)) { continue; }
                 sb.Append($"{argumentType} {argumentName}, ");
             }
@@ -361,7 +368,7 @@ namespace Nuruwo.Tool
             var sb = new StringBuilder();
             foreach (var field in fieldList)
             {
-                var (argumentType, _, pArgumentName) = GetTypeAndNamesFromField(field);
+                var (argumentType, _, pArgumentName, _) = GetTypeAndNamesFromField(field);
                 if (string.IsNullOrEmpty(argumentType)) { continue; }
 
                 var typeIsReference = CheckDataTokenTypeIsReference(argumentType);
@@ -378,7 +385,7 @@ namespace Nuruwo.Tool
             var sb = new StringBuilder();
             foreach (var field in fieldList)
             {
-                var (argumentType, _, pArgumentName) = GetTypeAndNamesFromField(field);
+                var (argumentType, _, pArgumentName, _) = GetTypeAndNamesFromField(field);
                 if (string.IsNullOrEmpty(argumentType)) { continue; }
 
                 var typeIsReference = CheckDataTokenTypeIsReference(argumentType);
@@ -401,14 +408,19 @@ namespace Nuruwo.Tool
             return sb.ToString();
         }
 
-        private (string, string, string) GetTypeAndNamesFromField(string field)
+        private (string, string, string, string) GetTypeAndNamesFromField(string field)
         {
             var args = Regex.Split(field.Trim(), @"\s+");
-            if (args.Length != 2) { return (string.Empty, string.Empty, string.Empty); }
+            if (args.Length < 2) { return (string.Empty, string.Empty, string.Empty, string.Empty); }
             var argumentType = args[0].Trim();
             var argumentName = args[1].Trim();
             var pArgumentName = ToPascal(argumentName);
-            return (argumentType, argumentName, pArgumentName);
+            var jsonKey = string.Empty;
+            if (args.Length >= 3)
+            {
+                jsonKey = args[2].Trim();
+            }
+            return (argumentType, argumentName, pArgumentName, jsonKey);
         }
 
         private bool CheckDataTokenTypeIsReference(string argumentType)
@@ -465,42 +477,45 @@ namespace Nuruwo.Tool
 
         private string JsonFieldDeclaration(string field)
         {
-            var (argumentType, argumentName, _) = GetTypeAndNamesFromField(field);
+            var (argumentType, argumentName, _, jsonKey) = GetTypeAndNamesFromField(field);
             if (string.IsNullOrEmpty(argumentType)) { return string.Empty; }
+            //jsonKey
+            jsonKey = string.IsNullOrEmpty(jsonKey) ? argumentName : jsonKey;
 
             //type of arrays (List is not supported)
             var isArray = Regex.IsMatch(argumentType, @".+\[\s*\]");
             if (isArray)
             {
-                return GenerateJsonArrayField(argumentType, argumentName);
+                return GenerateJsonArrayField(argumentType, argumentName, jsonKey);
             }
 
             //type of defaults
-            return GetCastedTypeAndNameFromField(argumentType, argumentName, isArray);
+            return GetJsonCastedTypeAndNameFromField(argumentType, argumentName, isArray, jsonKey);
 
         }
 
-        private string GenerateJsonArrayField(string argumentType, string argumentName)
+        private string GenerateJsonArrayField(string argumentType, string argumentName, string jsonKey)
         {
             var sb = new StringBuilder();
 
             var pureType = argumentType.Replace("[]", "");
 
             sb.AppendLine();    //For readability
-            sb.AppendLine($"\tvar {argumentName}List = dic[\"{argumentName}\"].DataList;");
+            sb.AppendLine($"\tvar {argumentName}List = dic[\"{jsonKey}\"].DataList;");
             sb.AppendLine($"\tvar {argumentName}Count = {argumentName}List.Count;");
             sb.AppendLine($"\tvar {argumentName} = new {pureType}[{argumentName}Count];");
 
             sb.AppendLine($"\tfor (int i = 0; i < {argumentName}Count; i++)");
             sb.AppendLine($"\t{{");
-            sb.AppendLine(GetCastedTypeAndNameFromField(pureType, argumentName, true));
+
+            sb.AppendLine(GetJsonCastedTypeAndNameFromField(pureType, argumentName, true, jsonKey));
 
             sb.Append($"\t}}");
 
             return sb.ToString();
         }
 
-        private string GetCastedTypeAndNameFromField(string argumentType, string argumentName, bool isArrayElement)
+        private string GetJsonCastedTypeAndNameFromField(string argumentType, string argumentName, bool isArrayElement, string jsonKey)
         {
             //first. process Vector or Color
             switch (argumentType)
@@ -510,10 +525,10 @@ namespace Nuruwo.Tool
                 case "Vector3":
                 case "Vector4":
                 case "Quaternion":
-                    return GenerateJsonVectorField(argumentType, argumentName, isArrayElement);
+                    return GenerateJsonVectorField(argumentType, argumentName, isArrayElement, jsonKey);
                 case "Color":
                 case "Color32":
-                    return GenerateJsonColorField(argumentType, argumentName, isArrayElement);
+                    return GenerateJsonColorField(argumentType, argumentName, isArrayElement, jsonKey);
             }
 
             //second. other process.
@@ -522,7 +537,7 @@ namespace Nuruwo.Tool
             var leftPreString = isArrayElement ? "\t\t" : "\tvar ";
             var leftPostString = isArrayElement ? "[i]" : "";
             sb.Append($"{leftPreString}{argumentName}{leftPostString} = ");
-            var rightString = isArrayElement ? $"{argumentName}List[i]" : $"dic[\"{argumentName}\"]";
+            var rightString = isArrayElement ? $"{argumentName}List[i]" : $"dic[\"{jsonKey}\"]";
 
             //check option Enum
             var typeIsEnum = _enumList.ToArray().Contains(argumentType);
@@ -570,18 +585,18 @@ namespace Nuruwo.Tool
                     //Dark class
                     if (!isArrayElement)
                     {
-                        sb.Append($"{argumentType}.New(dic[\"{argumentName}\"].DataDictionary);");
+                        sb.Append($"{argumentType}.New(dic[\"{jsonKey}\"].DataDictionary);");
                     }
                     else
                     {
-                        sb.Append($"{argumentType}.New({argumentName}List[i].DataDictionary);");
+                        sb.Append($"{argumentType}.New({jsonKey}List[i].DataDictionary);");
                     }
                     break;
             }
             return sb.ToString();
         }
 
-        private string GenerateJsonColorField(string argumentType, string argumentName, bool isArrayElement)
+        private string GenerateJsonColorField(string argumentType, string argumentName, bool isArrayElement, string jsonKey)
         {
             var elementStrings = new string[] { "r", "g", "b", "a" };
             var elementNameStrings = new string[] { "R", "G", "B", "A" };
@@ -604,7 +619,7 @@ namespace Nuruwo.Tool
             }
             var tab = isArrayElement ? $"\t\t" : $"\t";
             var arrayElement = isArrayElement ? $"[i]" : $"";
-            var argNameString = isArrayElement ? $"{argumentName}List[i]" : $"dic[\"{argumentName}\"]";
+            var argNameString = isArrayElement ? $"{argumentName}List[i]" : $"dic[\"{jsonKey}\"]";
             var varRightString = _vectorOrColorAsDataList ? $"{argNameString}.DataList;" : $"{argNameString}.DataDictionary;";
             var dataName = $"{argumentName}Data";
             sb.AppendLine($"{tab}var {dataName} = {varRightString}");
@@ -630,7 +645,7 @@ namespace Nuruwo.Tool
             return sb.ToString();
         }
 
-        private string GenerateJsonVectorField(string argumentType, string argumentName, bool isArrayElement)
+        private string GenerateJsonVectorField(string argumentType, string argumentName, bool isArrayElement, string jsonKey)
         {
             var elementStrings = new string[] { "x", "y", "z", "w" };
             var elementNameStrings = new string[] { "X", "Y", "Z", "W" };
@@ -660,7 +675,7 @@ namespace Nuruwo.Tool
             }
             var tab = isArrayElement ? $"\t\t" : $"\t";
             var arrayElement = isArrayElement ? $"[i]" : $"";
-            var argNameString = isArrayElement ? $"{argumentName}List[i]" : $"dic[\"{argumentName}\"]";
+            var argNameString = isArrayElement ? $"{argumentName}List[i]" : $"dic[\"{jsonKey}\"]";
             var varRightString = _vectorOrColorAsDataList ? $"{argNameString}.DataList;" : $"{argNameString}.DataDictionary;";
             var dataName = $"{argumentName}Data";
             sb.AppendLine($"{tab}var {dataName} = {varRightString}");
@@ -699,7 +714,7 @@ namespace Nuruwo.Tool
             var dataBase = $"\tdata[(int)";
             foreach (var field in fieldList)
             {
-                var (argumentType, argumentName, pArgumentName) = GetTypeAndNamesFromField(field);
+                var (argumentType, argumentName, pArgumentName, _) = GetTypeAndNamesFromField(field);
                 if (string.IsNullOrEmpty(argumentType)) { continue; }
 
                 var typeIsReference = CheckDataTokenTypeIsReference(argumentType);
