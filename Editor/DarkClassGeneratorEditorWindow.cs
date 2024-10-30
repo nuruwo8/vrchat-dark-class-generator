@@ -333,6 +333,7 @@ namespace Nuruwo.Tool
 
             if (HasNameSpace)
             {
+                AppendLine();
                 Outdent();
                 AppendLine($"}}");
             }
@@ -340,6 +341,7 @@ namespace Nuruwo.Tool
 
         private void GenerateEnum()
         {
+            AppendLine($"// Enum for assigning index of field DataTokens");
             AppendLine($"enum {EnumName}");
             AppendLine($"{{");
             Indent();
@@ -586,7 +588,7 @@ namespace Nuruwo.Tool
                     }
                     else
                     {
-                        sb.Append($"{argumentType}.New({jsonKey}List[i].DataDictionary);");
+                        sb.Append($"{argumentType}.New({argumentName}List[i].DataDictionary);");
                     }
                     break;
             }
