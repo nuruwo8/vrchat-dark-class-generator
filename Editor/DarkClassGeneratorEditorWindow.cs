@@ -10,15 +10,18 @@ using UnityEngine;
 
 namespace Nuruwo.Tool
 {
+    /// <summary>
+    /// Class to draw EditorWindow
+    /// </summary>
     public class DarkClassGeneratorEditorWindow : EditorWindow
     {
         /*------------------------------private values----------------------------------*/
         private bool _loadFoldIsOpen = false;
         private bool _enumFoldIsOpen = false;
 
-        private bool _generateSetMethod = true;
-        private bool _jsonDeserializeMode = false;
-        private bool _vectorOrColorAsDataList = false;
+        private bool _doGenerateSetMethod = true;
+        private bool _isJsonDeserializeMode = false;
+        private bool _deserializeVectorOrColorAsDataList = false;
 
         private TextAsset _textAsset;
         private string _prevScriptName = string.Empty;
@@ -28,9 +31,9 @@ namespace Nuruwo.Tool
         private string _nameSpace = string.Empty;
         private List<string> _fieldList = new List<string>() { "int value" };
         private List<string> _enumList = new List<string>() { "UserEnum" };
-        private string _result = string.Empty;
         private string _generatedCode = string.Empty;
         private Vector2 _scrollPosition = Vector2.zero; //for textArea scroll
+
         /*------------------------------Initialize------------------------------*/
         [MenuItem("Tools/Nuruwo/DarkClassGenerator", false, 1)]
         public static void Open()
@@ -46,11 +49,28 @@ namespace Nuruwo.Tool
         }
 
         /*------------------------------UI Look---------------------------------*/
-
         private void OnGUI()
         {
-            //load from script
             EditorGUILayout.Space(10);
+
+            DrawLoadFromScript();
+            EditorGUILayout.Space(10);
+
+            DrawClassParameters();
+            EditorGUILayout.Space(5);
+
+            DrawOptions();
+            EditorGUILayout.Space(5);
+
+            DrawGenerateButton();
+            EditorGUILayout.Space(10);
+
+            DrawTextArea();
+        }
+
+        /*------------------------------Draw methods---------------------------------*/
+        private void DrawLoadFromScript()
+        {
             EditorGUILayout.BeginVertical(GUI.skin.box);
             _loadFoldIsOpen = EditorGUILayout.Foldout(_loadFoldIsOpen, "Load class parameters from script");
             if (_loadFoldIsOpen)
@@ -63,13 +83,15 @@ namespace Nuruwo.Tool
                 if (!string.IsNullOrEmpty(scriptName) && _prevScriptName != scriptName)
                 {
                     _prevScriptName = scriptName;   //script is changed
-                    LoadScript(_textAsset.text);
+                    (_nameSpace, _className, _fieldList) = DarkClassGenerator.LoadParameterFromScript(_textAsset.text);
+                    UpdateReorderableFieldList(_fieldList);
                 }
                 using (new EditorGUI.DisabledScope(string.IsNullOrEmpty(scriptName)))
                 {
                     if (GUILayout.Button("Reload script"))
                     {
-                        LoadScript(_textAsset.text);
+                        (_nameSpace, _className, _fieldList) = DarkClassGenerator.LoadParameterFromScript(_textAsset.text);
+                        UpdateReorderableFieldList(_fieldList);
                     }
                 }
                 EditorGUILayout.EndHorizontal();
@@ -77,8 +99,10 @@ namespace Nuruwo.Tool
                 EditorGUI.indentLevel--;
             }
             EditorGUILayout.EndVertical();
-            EditorGUILayout.Space(10);
+        }
 
+        private void DrawClassParameters()
+        {
             EditorGUILayout.BeginVertical(GUI.skin.box);
             GUILayout.Label("Class parameters", EditorStyles.boldLabel);
             EditorGUI.indentLevel++;
@@ -97,52 +121,65 @@ namespace Nuruwo.Tool
             _reorderableFieldList.DoLayoutList();
             EditorGUI.indentLevel--;
             EditorGUILayout.EndVertical();
+        }
+
+        private void DrawOptions()
+        {
+            EditorGUILayout.BeginVertical(GUI.skin.box);
+            GUILayout.Label("Options");
+            EditorGUI.indentLevel++;
+            EditorGUILayout.Space(5);
+            _doGenerateSetMethod = EditorGUILayout.ToggleLeft(" Generate Set methods", _doGenerateSetMethod);
+            EditorGUILayout.Space(5);
+            _isJsonDeserializeMode = EditorGUILayout.ToggleLeft(" JSON deserialize mode (Experimental)", _isJsonDeserializeMode);
+            EditorGUILayout.Space(10);
+            _deserializeVectorOrColorAsDataList = EditorGUILayout.ToggleLeft(" Vector or Color as DataList in JSON", _deserializeVectorOrColorAsDataList);
             EditorGUILayout.Space(5);
 
-            //options
+            //custom enum
+            _enumFoldIsOpen = EditorGUILayout.Foldout(_enumFoldIsOpen, "Set user enum list");
+            if (_enumFoldIsOpen)
             {
-                EditorGUILayout.BeginVertical(GUI.skin.box);
-                GUILayout.Label("Options");
-                EditorGUI.indentLevel++;
-                EditorGUILayout.Space(5);
-                _generateSetMethod = EditorGUILayout.ToggleLeft(" Generate Set methods", _generateSetMethod);
-                EditorGUILayout.Space(5);
-                _jsonDeserializeMode = EditorGUILayout.ToggleLeft(" JSON deserialize mode (Experimental)", _jsonDeserializeMode);
-                EditorGUILayout.Space(5);
-                EditorGUILayout.Space(5);
-                _vectorOrColorAsDataList = EditorGUILayout.ToggleLeft(" Vector or Color as DataList", _vectorOrColorAsDataList);
-                EditorGUILayout.Space(5);
-
-                //custom enum
-                _enumFoldIsOpen = EditorGUILayout.Foldout(_enumFoldIsOpen, "Set user enum list");
-                if (_enumFoldIsOpen)
-                {
-                    //Augment list
-                    _reorderableEnumList.DoLayoutList();
-                }
-
-                EditorGUI.indentLevel--;
-                EditorGUILayout.EndVertical();
-                EditorGUILayout.Space(5);
+                //Augment list
+                _reorderableEnumList.DoLayoutList();
             }
 
-            //Generate button
+            EditorGUI.indentLevel--;
+            EditorGUILayout.EndVertical();
+        }
+
+        private void DrawGenerateButton()
+        {
             var canGenerate = !string.IsNullOrEmpty(_className) && _fieldList.Count > 0 && !string.IsNullOrEmpty(_fieldList[0]);
+
+            var result = string.Empty;
+
             using (new EditorGUI.DisabledScope(!canGenerate))
             {
                 //Generate 
                 if (GUILayout.Button("Generate DarkClass"))
                 {
-                    _generatedCode = GenerateDarkClass(_generateSetMethod);
+                    var generator = new DarkClassGenerator(
+                        _nameSpace,
+                        _className,
+                        _fieldList,
+                        _enumList,
+                        _doGenerateSetMethod,
+                        _deserializeVectorOrColorAsDataList,
+                        _isJsonDeserializeMode,
+                        "\t"
+                    );
+                    _generatedCode = generator.GenerateDarkClassCode();
                     //clip board
                     EditorGUIUtility.systemCopyBuffer = _generatedCode;
-                    _result = "Code is generated and Copied to clipboard.";
+                    result = "Code is generated and Copied to clipboard.";
                 }
             }
-            EditorGUILayout.Space(10);
+            GUILayout.Label(result);
+        }
 
-            //textArea
-            GUILayout.Label(_result);
+        private void DrawTextArea()
+        {
             _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition);
             var textAreaStyle = new GUIStyle(EditorStyles.textArea)
             {
@@ -152,6 +189,7 @@ namespace Nuruwo.Tool
             EditorGUILayout.EndScrollView();
         }
 
+        /*------------------------------Reorderable List---------------------------------*/
         private void UpdateReorderableFieldList(List<string> list)
         {
             _fieldList = list;
@@ -189,296 +227,254 @@ namespace Nuruwo.Tool
                 _enumList[index] = EditorGUI.TextField(rect, "  Enum type " + index, _enumList[index]);
             };
         }
-        /*------------------------------Generate DarkClass-----------------------------*/
+    }
 
-        private string GenerateDarkClass(bool generateSetMethod)
+    /// <summary>
+    /// Class to Generate DarkClass and LoadScript
+    /// </summary>
+    internal class DarkClassGenerator
+    {
+        /*------------------------------private values----------------------------------*/
+        private enum VectorOrColor
         {
-            var sb = new StringBuilder();
-            var pClassName = ToPascal(_className);
-            var enumName = pClassName + "Field";
+            VECTOR,
+            COLOR
+        }
 
-            sb.Append(GenerateHeaderWithNameSpace(_nameSpace));
-            var nameSpaceIsExist = !string.IsNullOrEmpty(_nameSpace);
-            var nst = nameSpaceIsExist ? 1 : 0; //namespace tab number
+        private readonly StringBuilder _stringBuilder;
+        private int _indentLevel;
 
-            //enum
-            sb.Append(AddTabLines("// Enum for assigning index of field DataTokens\r\n", nst));
-            var enumString = GenerateEnum(enumName);
-            sb.Append(AddTabLines(enumString, nst));
-            sb.AppendLine();
+        private readonly string _nameSpace;
+        private readonly string _className;
+        private readonly List<string> _fieldList;
+        private readonly List<string> _enumList;
+        private readonly string _indentStringUnit;
+        private readonly bool _doGenerateSetMethod;
+        private readonly bool _deserializeVectorOrColorAsDataList;
+        private readonly bool _isJsonDeserializeMode;
 
-            //main class 
-            var classHeaderString = GenerateClassHeader(pClassName);
-            sb.Append(AddTabLines(classHeaderString, nst));
-            sb.Append(AddTabLines("// Constructor\r\n", nst + 1));
-            if (!_jsonDeserializeMode)
+        private string EnumName => $"{_className}Field";
+        private bool HasNameSpace => !string.IsNullOrEmpty(_nameSpace);
+
+        /*------------------------------Constructor------------------------------*/
+        public DarkClassGenerator(
+            string nameSpace,
+            string className,
+            List<string> fieldList,
+            List<string> enumList,
+            bool doGenerateSetMethod = true,
+            bool deserializeVectorOrColorAsDataList = false,
+            bool isJsonDeserializeMode = false,
+            string indentStringUnit = "\t")
+        {
+            _stringBuilder = new StringBuilder();
+            _className = className;
+            _nameSpace = nameSpace;
+            _className = className;
+            _fieldList = fieldList;
+            _enumList = enumList;
+            _doGenerateSetMethod = doGenerateSetMethod;
+            _deserializeVectorOrColorAsDataList = deserializeVectorOrColorAsDataList;
+            _isJsonDeserializeMode = isJsonDeserializeMode;
+            _indentStringUnit = indentStringUnit;
+        }
+
+        /*------------------------------Public methods------------------------------*/
+        public string GenerateDarkClassCode()
+        {
+            _stringBuilder.Clear(); // Clear before generate
+            _indentLevel = 0;   // Clear indent
+
+            GenerateUsingHeader();
+            GenerateNamespaceScope();
+
+            return _stringBuilder.ToString();   //return result
+        }
+
+        public static (string nameSpace, string className, List<string> fieldList) LoadParameterFromScript(string text)
+        {
+            Debug.Log("LoadScript: " + text);
+            var oneLineText = text.Replace("\r\n", "\n").Replace("\n", " "); //remove line break and join with space
+
+            //namespace
+            var nameSpace = ExtractNameSpace(oneLineText);
+
+            //className
+            var className = ExtractClassName(oneLineText);
+
+            //Fields
+            var fieldList = !string.IsNullOrEmpty(className) ? ExtractFields(oneLineText, className) : new List<string>();
+
+            return (nameSpace, className, fieldList);
+        }
+
+        /*-----------------------Generate methods----------------------------*/
+        private void GenerateUsingHeader()
+        {
+            AppendLine($"using UnityEngine;");
+            AppendLine($"using VRC.SDK3.Data;");
+            AppendLine();
+        }
+
+        private void GenerateNamespaceScope()
+        {
+            if (HasNameSpace)
+            {
+                AppendLine($"namespace {_nameSpace}");
+                AppendLine($"{{");
+                Indent();
+            }
+
+            GenerateEnum();
+            AppendLine();
+            GenerateMainClassScope();
+            AppendLine();
+            GenerateExtensionClassScope();
+
+            if (HasNameSpace)
+            {
+                Outdent();
+                AppendLine($"}}");
+            }
+        }
+
+        private void GenerateEnum()
+        {
+            AppendLine($"enum {EnumName}");
+            AppendLine($"{{");
+            Indent();
+            foreach (var field in _fieldList)
+            {
+                var (_, argumentName) = GetTypeAndNameFromField(field);
+                if (string.IsNullOrEmpty(argumentName)) { continue; }
+                var pArgumentName = ToPascal(argumentName);
+                AppendLine($"{pArgumentName},");
+            }
+            AppendLine();
+            AppendLine($"Count");
+            Outdent();
+            AppendLine($"}}");
+        }
+
+        /*-----------------------Main class scope--------------------------------*/
+        private void GenerateMainClassScope()
+        {
+            AppendLine($"[AddComponentMenu(\"\")]");
+            AppendLine($"public class {_className} : DataList");
+            AppendLine($"{{");
+            Indent();
+
+            AppendLine("// Constructor");
+            if (!_isJsonDeserializeMode)
             {
                 // default mode
-                var mainClassString = GenerateDefaultConstructor(pClassName, enumName, _fieldList);
-                sb.Append(AddTabLines(mainClassString, nst + 1));
-                sb.Append(GenerateClassFooter(nameSpaceIsExist));
-                sb.AppendLine();
+                GenerateDefaultConstructor();
             }
             else
             {
                 //json mode
-                var commentForLoadScript = GenerateCommentForLoadScript(pClassName, _fieldList);
-                sb.Append(AddTabLines(commentForLoadScript, nst + 1));
-                var mainClassString = GenerateJsonConstructor(pClassName, enumName, _fieldList);
-                sb.Append(AddTabLines(mainClassString, nst + 1));
-                sb.Append(GenerateClassFooter(nameSpaceIsExist));
-                sb.AppendLine();
+                GenerateCommentForLoadScriptInJsonMode();
+                GenerateJsonConstructor();
             }
 
-            //extension class
-            var extensionClassHeaderString = GenerateExtensionClassHeader(pClassName);
-            sb.Append(AddTabLines(extensionClassHeaderString, nst));
-            sb.Append(AddTabLines("// Get methods\r\n", nst + 1));
-            var getMethodsString = GenerateGetMethods(pClassName, enumName, _fieldList);
-            sb.Append(AddTabLines(getMethodsString, nst + 1));
-            if (generateSetMethod)
-            {
-                sb.AppendLine();
-                sb.Append(AddTabLines("// Set methods\r\n", nst + 1));
-                var setMethodsString = GenerateSetMethods(pClassName, enumName, _fieldList);
-                sb.Append(AddTabLines(setMethodsString, nst + 1));
-            }
-            sb.Append(GenerateFooter(nameSpaceIsExist));
-
-            //result
-            return sb.ToString();
+            Outdent();
+            AppendLine($"}}");
         }
 
-        /*------------------------------Load script-----------------------------*/
-        private string GenerateCommentForLoadScript(string pClassName, List<string> fieldList)
+        private void GenerateDefaultConstructor()
         {
-            var sb = new StringBuilder();
-            sb.AppendLine($"// This comments for loading this script by generator : ");
-            sb.Append($"// public static {pClassName} New(");
-            foreach (var field in fieldList)
+            Append($"public static {_className} New(");
             {
-                var (argumentType, argumentName, _, jsonKey) = GetTypeAndNamesFromField(field);
+                var arguments = new List<string>();
+                foreach (var field in _fieldList)
+                {
+                    var (argumentType, argumentName) = GetTypeAndNameFromField(field);
+                    if (string.IsNullOrEmpty(argumentType)) { continue; }
+                    arguments.Add($"{argumentType} {argumentName}");
+                }
+                Append(string.Join(", ", arguments), false);
+            }
+            AppendLine($")", false);
+
+            AppendLine($"{{");
+            Indent();
+
+            //data token 
+            GenerateDataTokenAssign();
+
+            Outdent();
+            AppendLine($"}}");
+        }
+
+        private void GenerateDataTokenAssign()
+        {
+            //data token 
+            AppendLine($"var data = new DataToken[(int){EnumName}.Count];");
+            AppendLine();
+
+            foreach (var field in _fieldList)
+            {
+                var (argumentType, argumentName) = GetTypeAndNameFromField(field);
+                if (string.IsNullOrEmpty(argumentType)) { continue; }
+                var pArgumentName = ToPascal(argumentName);
+                var typeIsReference = CheckDataTokenTypeIsReference(argumentType);
+                var arg = typeIsReference ? $"new DataToken({argumentName})" : $"{argumentName}";
+
+                AppendLine($"data[(int){EnumName}.{pArgumentName}] = {arg};");
+            }
+
+            AppendLine();
+            AppendLine($"return ({_className})new DataList(data);");
+        }
+
+        /*-----------------------Json generate in Main class --------------------------------*/
+        private void GenerateCommentForLoadScriptInJsonMode()
+        {
+            AppendLine($"// This comments for loading this script by generator : ");
+            Append($"// public static {_className} New(");
+            var arguments = new List<string>();
+            foreach (var field in _fieldList)
+            {
+                var (argumentType, argumentName, jsonKey) = GetTypeAndNameAndJsonKeyFromField(field);
                 if (string.IsNullOrEmpty(argumentType)) { continue; }
                 if (!string.IsNullOrEmpty(jsonKey))
                 {
-                    sb.Append($"{argumentType} {argumentName} {jsonKey}, ");
+                    arguments.Add($"{argumentType} {argumentName} {jsonKey}");
                 }
                 else
                 {
-                    sb.Append($"{argumentType} {argumentName}, ");
+                    arguments.Add($"{argumentType} {argumentName}");
                 }
             }
-            sb.Remove(sb.Length - 2, 2);    //remove last comma and space
-            sb.AppendLine($")");
-            return sb.ToString();
+            Append(string.Join(", ", arguments), false);
+
+            AppendLine($")", false);
         }
 
-        /*------------------------------Generate Default Part Code-----------------------------*/
-        private string GenerateClassFooter(bool nameSpaceIsExist)
+        private void GenerateJsonConstructor()
         {
-            return nameSpaceIsExist ? "\t}\r\n" : "}\r\n";
-        }
+            AppendLine($"public static {_className} New(DataDictionary dic)");
+            AppendLine($"{{");
+            Indent();
 
-        private string AddTabLines(string srcText, int tabNum)
-        {
-            var sb = new StringBuilder();
-            var texts = srcText.Replace("\r\n", "\n").Split("\n");
-            for (int i = 0; i < texts.Length - 1; i++)  //last line is empty
-            {
-                var tabText = String.Copy(texts[i]);
-                for (int j = 0; j < tabNum; j++)
-                {
-                    tabText = tabText.Insert(0, "\t");
-                }
-                sb.AppendLine(tabText);
-            }
-            return sb.ToString();
-        }
-
-        private string GenerateHeaderWithNameSpace(string nameSpace)
-        {
-            var sb = new StringBuilder();
-            sb.AppendLine($"using UnityEngine;");
-            sb.AppendLine($"using VRC.SDK3.Data;");
-            sb.AppendLine("");
-            if (!string.IsNullOrEmpty(nameSpace))
-            {
-                sb.AppendLine($"namespace {nameSpace}");
-                sb.AppendLine($"{{");
-            }
-            return sb.ToString();
-        }
-
-        private string GenerateEnum(string enumName)
-        {
-            var sb = new StringBuilder();
-            sb.AppendLine($"enum {enumName}");
-            sb.AppendLine($"{{");
             foreach (var field in _fieldList)
             {
-                var (argumentType, _, pArgumentName, _) = GetTypeAndNamesFromField(field);
-                if (string.IsNullOrEmpty(argumentType)) { continue; }
-                sb.AppendLine($"\t{pArgumentName},");
+                GenerateJsonFieldDeclaration(field);
             }
-            sb.AppendLine($"");
-            sb.AppendLine($"\tCount");
-            sb.AppendLine($"}}");
-            return sb.ToString();
-        }
-
-        private string GenerateClassHeader(string pClassName)
-        {
-            var sb = new StringBuilder();
-
-            sb.AppendLine($"[AddComponentMenu(\"\")]");
-            sb.AppendLine($"public class {pClassName} : DataList");
-            sb.AppendLine($"{{");
-            return sb.ToString();
-        }
-
-        private string GenerateDefaultConstructor(string pClassName, string enumName, List<string> fieldList)
-        {
-            var sb = new StringBuilder();
-            sb.Append($"public static {pClassName} New(");
-            foreach (var field in fieldList)
-            {
-                var (argumentType, argumentName, _, _) = GetTypeAndNamesFromField(field);
-                if (string.IsNullOrEmpty(argumentType)) { continue; }
-                sb.Append($"{argumentType} {argumentName}, ");
-            }
-            sb.Remove(sb.Length - 2, 2);    //remove last comma and space
-            sb.AppendLine($")");
-            sb.AppendLine($"{{");
-
-            //data token 
-            sb.Append(GenerateDataTokenAssign(pClassName, enumName, fieldList));
-            return sb.ToString();
-        }
-
-        private string GenerateExtensionClassHeader(string pClassName)
-        {
-            var sb = new StringBuilder();
-            sb.AppendLine($"public static class {pClassName}Ext");
-            sb.AppendLine($"{{");
-            return sb.ToString();
-        }
-
-        private string GenerateGetMethods(string pClassName, string enumName, List<string> fieldList)
-        {
-            var sb = new StringBuilder();
-            foreach (var field in fieldList)
-            {
-                var (argumentType, _, pArgumentName, _) = GetTypeAndNamesFromField(field);
-                if (string.IsNullOrEmpty(argumentType)) { continue; }
-
-                var typeIsReference = CheckDataTokenTypeIsReference(argumentType);
-                var dataTokenType = typeIsReference ? $".Reference" : $"";
-
-                sb.AppendLine($"public static {argumentType} {pArgumentName}(this {pClassName} instance)");
-                sb.AppendLine($"\t=> ({argumentType})instance[(int){enumName}.{pArgumentName}]{dataTokenType};");
-            }
-            return sb.ToString();
-        }
-
-        private string GenerateSetMethods(string pClassName, string enumName, List<string> fieldList)
-        {
-            var sb = new StringBuilder();
-            foreach (var field in fieldList)
-            {
-                var (argumentType, _, pArgumentName, _) = GetTypeAndNamesFromField(field);
-                if (string.IsNullOrEmpty(argumentType)) { continue; }
-
-                var typeIsReference = CheckDataTokenTypeIsReference(argumentType);
-                var arg = typeIsReference ? $"new DataToken(arg)" : $"arg";
-
-                sb.AppendLine($"public static void {pArgumentName}(this {pClassName} instance, {argumentType} arg)");
-                sb.AppendLine($"\t=> instance[(int){enumName}.{pArgumentName}] = {arg};");
-            }
-            return sb.ToString();
-        }
-
-        private string GenerateFooter(bool nameSpaceIsExist)
-        {
-            var sb = new StringBuilder();
-            if (nameSpaceIsExist)
-            {
-                sb.AppendLine("\t}");
-            }
-            sb.Append("}");
-            return sb.ToString();
-        }
-
-        private (string, string, string, string) GetTypeAndNamesFromField(string field)
-        {
-            var args = Regex.Split(field.Trim(), @"\s+");
-            if (args.Length < 2) { return (string.Empty, string.Empty, string.Empty, string.Empty); }
-            var argumentType = args[0].Trim();
-            var argumentName = args[1].Trim();
-            var pArgumentName = ToPascal(argumentName);
-            var jsonKey = string.Empty;
-            if (args.Length >= 3)
-            {
-                jsonKey = args[2].Trim();
-            }
-            return (argumentType, argumentName, pArgumentName, jsonKey);
-        }
-
-        private bool CheckDataTokenTypeIsReference(string argumentType)
-        {
-            var typeIsEnum = _enumList.ToArray().Contains(argumentType);
-            if (typeIsEnum)
-            {
-                //user enum type is Reference
-                return true;
-            }
-
-            if (Regex.IsMatch(argumentType, @"\[\s*\]"))
-            {
-                //array is reference
-                return true;
-            }
-
-            //You can add more types
-            var referenceCastTypes = new string[]{
-                "TrackingDataType",
-                "HumanBodyBones",
-                "TextureWrapMode",
-                "GraphicsFormat",
-                "TextureFormat",
-                "Vector2",
-                "Vector3",
-                "Vector4",
-                "Quaternion",
-                "Color",
-                "Color32",
-            };
-
-            return Array.IndexOf(referenceCastTypes, argumentType) != -1;   //if type is find in array. return true;
-        }
-
-        /*------------------------------Generate JSON Part Code-----------------------------*/
-
-        private string GenerateJsonConstructor(string pClassName, string enumName, List<string> fieldList)
-        {
-            var sb = new StringBuilder();
-            sb.AppendLine($"public static {pClassName} New(DataDictionary dic)");
-            sb.AppendLine($"{{");
-            foreach (var field in fieldList)
-            {
-                var jsonField = JsonFieldDeclaration(field);
-                sb.AppendLine(jsonField);
-            }
-            sb.AppendLine();
+            AppendLine();
 
             //object 
-            sb.Append(GenerateDataTokenAssign(pClassName, enumName, fieldList));
-            return sb.ToString();
+            AppendLine($"// Make DataTokens");
+            GenerateDataTokenAssign();
+
+            Outdent();
+            AppendLine($"}}");
         }
 
-        private string JsonFieldDeclaration(string field)
+        private void GenerateJsonFieldDeclaration(string field)
         {
-            var (argumentType, argumentName, _, jsonKey) = GetTypeAndNamesFromField(field);
-            if (string.IsNullOrEmpty(argumentType)) { return string.Empty; }
+            var (argumentType, argumentName, jsonKey) = GetTypeAndNameAndJsonKeyFromField(field);
+            if (string.IsNullOrEmpty(argumentType)) { return; }
             //jsonKey
             jsonKey = string.IsNullOrEmpty(jsonKey) ? argumentName : jsonKey;
 
@@ -486,36 +482,33 @@ namespace Nuruwo.Tool
             var isArray = Regex.IsMatch(argumentType, @".+\[\s*\]");
             if (isArray)
             {
-                return GenerateJsonArrayField(argumentType, argumentName, jsonKey);
+                GenerateJsonArrayField(argumentType, argumentName, jsonKey);
             }
-
-            //type of defaults
-            return GetJsonCastedTypeAndNameFromField(argumentType, argumentName, isArray, jsonKey);
-
+            else
+            {
+                //type of defaults
+                GenerateJsonCastedTypeAndNameFromField(argumentType, argumentName, isArray, jsonKey);
+            }
         }
 
-        private string GenerateJsonArrayField(string argumentType, string argumentName, string jsonKey)
+        private void GenerateJsonArrayField(string argumentType, string argumentName, string jsonKey)
         {
-            var sb = new StringBuilder();
-
             var pureType = argumentType.Replace("[]", "");
 
-            sb.AppendLine();    //For readability
-            sb.AppendLine($"\tvar {argumentName}List = dic[\"{jsonKey}\"].DataList;");
-            sb.AppendLine($"\tvar {argumentName}Count = {argumentName}List.Count;");
-            sb.AppendLine($"\tvar {argumentName} = new {pureType}[{argumentName}Count];");
+            AppendLine();    //For readability
+            AppendLine($"var {argumentName}List = dic[\"{jsonKey}\"].DataList;");
+            AppendLine($"var {argumentName}Count = {argumentName}List.Count;");
+            AppendLine($"var {argumentName} = new {pureType}[{argumentName}Count];");
 
-            sb.AppendLine($"\tfor (int i = 0; i < {argumentName}Count; i++)");
-            sb.AppendLine($"\t{{");
+            AppendLine($"for (int i = 0; i < {argumentName}Count; i++)");
+            AppendLine($"{{");
 
-            sb.AppendLine(GetJsonCastedTypeAndNameFromField(pureType, argumentName, true, jsonKey));
+            GenerateJsonCastedTypeAndNameFromField(pureType, argumentName, true, jsonKey);
 
-            sb.Append($"\t}}");
-
-            return sb.ToString();
+            AppendLine($"}}");
         }
 
-        private string GetJsonCastedTypeAndNameFromField(string argumentType, string argumentName, bool isArrayElement, string jsonKey)
+        private void GenerateJsonCastedTypeAndNameFromField(string argumentType, string argumentName, bool isArrayElement, string jsonKey)
         {
             //first. process Vector or Color
             switch (argumentType)
@@ -525,17 +518,20 @@ namespace Nuruwo.Tool
                 case "Vector3":
                 case "Vector4":
                 case "Quaternion":
-                    return GenerateJsonVectorField(argumentType, argumentName, isArrayElement, jsonKey);
+                    GenerateJsonVectorOrColorField(argumentType, argumentName, isArrayElement, jsonKey, VectorOrColor.VECTOR);
+                    return;
                 case "Color":
                 case "Color32":
-                    return GenerateJsonColorField(argumentType, argumentName, isArrayElement, jsonKey);
+                    GenerateJsonVectorOrColorField(argumentType, argumentName, isArrayElement, jsonKey, VectorOrColor.COLOR);
+                    return;
             }
 
             //second. other process.
-            var sb = new StringBuilder();
-
-            var leftPreString = isArrayElement ? "\t\t" : "\tvar ";
+            var leftPreString = isArrayElement ? "\t" : "var ";
             var leftPostString = isArrayElement ? "[i]" : "";
+
+            //make StringBuilder. it should be one line to AppendLine() correctly.
+            var sb = new StringBuilder();
             sb.Append($"{leftPreString}{argumentName}{leftPostString} = ");
             var rightString = isArrayElement ? $"{argumentName}List[i]" : $"dic[\"{jsonKey}\"]";
 
@@ -545,7 +541,8 @@ namespace Nuruwo.Tool
             {
                 //custom enum
                 sb.Append($"({argumentType})(int){rightString}.Number;");
-                return sb.ToString();
+                AppendLine(sb.ToString());
+                return;
             }
 
             //switch with arg type
@@ -553,7 +550,7 @@ namespace Nuruwo.Tool
             {
                 case "bool":
                     sb.Append($"{rightString}.Boolean;");
-                    break;
+                    return;
                 case "char":
                     sb.Append($"{rightString}.String[0];");
                     break;
@@ -593,162 +590,263 @@ namespace Nuruwo.Tool
                     }
                     break;
             }
-            return sb.ToString();
+            AppendLine(sb.ToString());
+            return;
         }
 
-        private string GenerateJsonColorField(string argumentType, string argumentName, bool isArrayElement, string jsonKey)
+        private void GenerateJsonVectorOrColorField(string argumentType, string argumentName, bool isArrayElement, string jsonKey, VectorOrColor type)
         {
-            var elementStrings = new string[] { "r", "g", "b", "a" };
-            var elementNameStrings = new string[] { "R", "G", "B", "A" };
-            var elementNum = elementStrings.Length;
+            //prepare strings
+            var elementStrings = new string[0];
+
+            switch (type)
+            {
+                case VectorOrColor.VECTOR:
+                    elementStrings = new string[] { "x", "y", "z", "w" };
+                    break;
+                case VectorOrColor.COLOR:
+                    elementStrings = new string[] { "r", "g", "b", "a" };
+                    break;
+            }
+
+            int elementNum;
+            switch (argumentType)
+            {
+                case "Vector2":
+                    elementNum = 2;
+                    break;
+                case "Vector3":
+                    elementNum = 3;
+                    break;
+                case "Vector4":
+                case "Quaternion":
+                case "Color":
+                case "Color32":
+                    elementNum = 4;
+                    break;
+                default:
+                    elementNum = 4;
+                    break;
+            }
 
             var cast = string.Empty;
-            if (argumentType == "Color")
+            switch (type)
             {
-                cast = "(float)";
-            }
-            else if (argumentType == "Color32")
-            {
-                cast = "(byte)";
+                case VectorOrColor.VECTOR:
+                    cast = "(float)";
+                    break;
+                case VectorOrColor.COLOR:
+                    switch (argumentType)
+                    {
+                        case "Color":
+                            cast = "(float)";
+                            break;
+                        case "Color32":
+                            cast = "(byte)";
+                            break;
+                        default:
+                            break;
+                    }
+                    break;
             }
 
-            var sb = new StringBuilder();
-            if (!isArrayElement)
-            {
-                sb.AppendLine();    //For readability
-            }
-            var tab = isArrayElement ? $"\t\t" : $"\t";
+            if (isArrayElement) { Indent(); }
             var arrayElement = isArrayElement ? $"[i]" : $"";
             var argNameString = isArrayElement ? $"{argumentName}List[i]" : $"dic[\"{jsonKey}\"]";
-            var varRightString = _vectorOrColorAsDataList ? $"{argNameString}.DataList;" : $"{argNameString}.DataDictionary;";
+            var varRightString = _deserializeVectorOrColorAsDataList ? $"{argNameString}.DataList;" : $"{argNameString}.DataDictionary;";
             var dataName = $"{argumentName}Data";
-            sb.AppendLine($"{tab}var {dataName} = {varRightString}");
+
+            // make string
+            if (!isArrayElement)
+            {
+                AppendLine();    //For readability
+            }
+            AppendLine($"var {dataName} = {varRightString}");
 
             for (int i = 0; i < elementNum; i++)
             {
-                var elementName = argumentName + elementNameStrings[i];
-                var elementTarget = _vectorOrColorAsDataList ? $"[{i}]" : $"[\"{elementStrings[i]}\"]";
-                sb.AppendLine($"{tab}var {elementName} = {cast}{dataName}{elementTarget}.Number;");
+                var elementName = argumentName + elementStrings[i].ToUpper();
+                var elementTarget = _deserializeVectorOrColorAsDataList ? $"[{i}]" : $"[\"{elementStrings[i]}\"]";
+                AppendLine($"var {elementName} = {cast}{dataName}{elementTarget}.Number;");
             }
 
             //constructor
             var varString = isArrayElement ? $"" : $"var ";
-            sb.Append($"{tab}{varString}{argumentName}{arrayElement} = new {argumentType}(");
+            Append($"{varString}{argumentName}{arrayElement} = new {argumentType}(");
+
+            var arguments = new List<string>();
             for (int i = 0; i < elementNum; i++)
             {
-                var elementName = argumentName + elementNameStrings[i];
-                sb.Append($"{elementName}");
-                if (i < elementNum - 1) { sb.Append(", "); }    //except last
+                arguments.Add(argumentName + elementStrings[i].ToUpper());
             }
-            sb.Append($");");
+            Append(string.Join(", ", arguments), false);
+            AppendLine($");", false);
 
-            return sb.ToString();
+            if (isArrayElement) { Outdent(); }
         }
 
-        private string GenerateJsonVectorField(string argumentType, string argumentName, bool isArrayElement, string jsonKey)
+
+        /*-----------------------Extension class scope--------------------------------*/
+        private void GenerateExtensionClassScope()
         {
-            var elementStrings = new string[] { "x", "y", "z", "w" };
-            var elementNameStrings = new string[] { "X", "Y", "Z", "W" };
+            AppendLine($"public static class {_className}Ext");
+            AppendLine($"{{");
+            Indent();
 
-            var elementNum = 0;
-            if (argumentType == "Vector2")
+            AppendLine("// Get methods");
+            GenerateGetMethods();
+
+            if (_doGenerateSetMethod)
             {
-                elementNum = 2;
-            }
-            else if (argumentType == "Vector3")
-            {
-                elementNum = 3;
-            }
-            else if (argumentType == "Vector4")
-            {
-                elementNum = 4;
-            }
-            else if (argumentType == "Quaternion")
-            {
-                elementNum = 4;
+                AppendLine();
+                AppendLine("// Set methods");
+                GenerateSetMethods();
             }
 
-            var sb = new StringBuilder();
-            if (!isArrayElement)
-            {
-                sb.AppendLine();    //For readability
-            }
-            var tab = isArrayElement ? $"\t\t" : $"\t";
-            var arrayElement = isArrayElement ? $"[i]" : $"";
-            var argNameString = isArrayElement ? $"{argumentName}List[i]" : $"dic[\"{jsonKey}\"]";
-            var varRightString = _vectorOrColorAsDataList ? $"{argNameString}.DataList;" : $"{argNameString}.DataDictionary;";
-            var dataName = $"{argumentName}Data";
-            sb.AppendLine($"{tab}var {dataName} = {varRightString}");
-
-            for (int i = 0; i < elementNum; i++)
-            {
-                var elementName = argumentName + elementNameStrings[i];
-                var elementTarget = _vectorOrColorAsDataList ? $"[{i}]" : $"[\"{elementStrings[i]}\"]";
-                sb.AppendLine($"{tab}var {elementName} = (float){dataName}{elementTarget}.Number;");
-            }
-
-            //constructor
-            var varString = isArrayElement ? $"" : $"var ";
-            sb.Append($"{tab}{varString}{argumentName}{arrayElement} = new {argumentType}(");
-            for (int i = 0; i < elementNum; i++)
-            {
-                var elementName = argumentName + elementNameStrings[i];
-                sb.Append($"{elementName}");
-                if (i < elementNum - 1) { sb.Append(", "); }    //except last
-            }
-            sb.Append($");");
-
-            return sb.ToString();
+            Outdent();
+            AppendLine($"}}");
         }
 
-        /*------------------------------Utility----------------------------------*/
-        private string GenerateDataTokenAssign(string pClassName, string enumName, List<string> fieldList)
+
+        private void GenerateGetMethods()
         {
-            var sb = new StringBuilder();
-
-            //data token 
-            sb.AppendLine($"\t// Make DataTokens");
-            sb.AppendLine($"\tvar data = new DataToken[(int){enumName}.Count];");
-            sb.AppendLine();
-
-            var dataBase = $"\tdata[(int)";
-            foreach (var field in fieldList)
+            foreach (var field in _fieldList)
             {
-                var (argumentType, argumentName, pArgumentName, _) = GetTypeAndNamesFromField(field);
+                var (argumentType, argumentName) = GetTypeAndNameFromField(field);
                 if (string.IsNullOrEmpty(argumentType)) { continue; }
+                var pArgumentName = ToPascal(argumentName);
 
                 var typeIsReference = CheckDataTokenTypeIsReference(argumentType);
-                var arg = typeIsReference ? $"new DataToken({argumentName})" : $"{argumentName}";
+                var dataTokenType = typeIsReference ? $".Reference" : $"";
 
-                sb.AppendLine($"{dataBase}{enumName}.{pArgumentName}] = {arg};");
+                AppendLine($"public static {argumentType} {pArgumentName}(this {_className} instance)");
+                AppendLine($"=> ({argumentType})instance[(int){EnumName}.{pArgumentName}]{dataTokenType};");
             }
-
-            sb.AppendLine();
-            sb.AppendLine($"\treturn ({pClassName})new DataList(data);");
-            sb.AppendLine($"}}");
-            return sb.ToString();
         }
 
-        private void LoadScript(string text)
+        private void GenerateSetMethods()
         {
-            Debug.Log("LoadScript: " + text);
-            var oneLineText = text.Replace("\r\n", "\n").Replace("\n", " "); //remove line break and join with space
-
-            //namespace
-            _nameSpace = ExtractNameSpace(oneLineText);
-
-            //className
-            _className = ExtractClassName(oneLineText);
-
-            //Fields
-            if (!string.IsNullOrEmpty(_className))
+            foreach (var field in _fieldList)
             {
-                var fieldStrings = ExtractFields(oneLineText, _className);
-                if (fieldStrings.Count > 0) { UpdateReorderableFieldList(fieldStrings); }
+                var (argumentType, argumentName) = GetTypeAndNameFromField(field);
+                if (string.IsNullOrEmpty(argumentType)) { continue; }
+                var pArgumentName = ToPascal(argumentName);
+
+                var typeIsReference = CheckDataTokenTypeIsReference(argumentType);
+                var arg = typeIsReference ? $"new DataToken(arg)" : $"arg";
+
+                AppendLine($"public static void {pArgumentName}(this {_className} instance, {argumentType} arg)");
+                AppendLine($"\t=> instance[(int){EnumName}.{pArgumentName}] = {arg};");
             }
         }
 
-        private string ExtractNameSpace(string oneLineText)
+        /*----------------------Parameters Utilities ----------------------------*/
+        private (string, string) GetTypeAndNameFromField(string field)
+        {
+            var args = Regex.Split(field.Trim(), @"\s+");
+            if (args.Length < 2) { return (string.Empty, string.Empty); }
+            var argumentType = args[0].Trim();
+            var argumentName = args[1].Trim();
+            return (argumentType, argumentName);
+        }
+
+        private (string, string, string) GetTypeAndNameAndJsonKeyFromField(string field)
+        {
+            var args = Regex.Split(field.Trim(), @"\s+");
+            if (args.Length < 2) { return (string.Empty, string.Empty, string.Empty); }
+            var argumentType = args[0].Trim();
+            var argumentName = args[1].Trim();
+            var jsonKey = string.Empty;
+            if (args.Length >= 3)
+            {
+                jsonKey = args[2].Trim();
+            }
+            return (argumentType, argumentName, jsonKey);
+        }
+
+        private bool CheckDataTokenTypeIsReference(string argumentType)
+        {
+            var typeIsEnum = _enumList.ToArray().Contains(argumentType);
+            if (typeIsEnum)
+            {
+                //user enum type is Reference
+                return true;
+            }
+
+            if (Regex.IsMatch(argumentType, @"\[\s*\]"))
+            {
+                //array is reference
+                return true;
+            }
+
+            //You can add more types
+            var referenceCastTypes = new string[]{
+                "TrackingDataType",
+                "HumanBodyBones",
+                "TextureWrapMode",
+                "GraphicsFormat",
+                "TextureFormat",
+                "Vector2",
+                "Vector3",
+                "Vector4",
+                "Quaternion",
+                "Color",
+                "Color32",
+            };
+
+            return Array.IndexOf(referenceCastTypes, argumentType) != -1;   //if type is find in array. return true;
+        }
+
+        /*------------------------------String Utilities---------------------------------*/
+        internal void Indent() { _indentLevel++; }
+
+        internal void Outdent() { _indentLevel--; }
+
+        private string IndentString()
+        {
+            return string.Concat(Enumerable.Repeat(_indentStringUnit, _indentLevel));
+        }
+
+        private StringBuilder Append<T>(T value, bool withIndent = true)
+        {
+            if (withIndent)
+            {
+                _stringBuilder.Append(IndentString());
+            }
+
+            _stringBuilder.Append(value);
+            return _stringBuilder;
+        }
+
+        private StringBuilder AppendLine(string value, bool withIndent = true)
+        {
+            if (withIndent)
+            {
+                _stringBuilder.Append(IndentString());
+            }
+
+            _stringBuilder.AppendLine(value);
+            return _stringBuilder;
+        }
+
+        internal StringBuilder AppendLine(bool withIndent = true)
+        {
+            if (withIndent)
+            {
+                _stringBuilder.Append(IndentString());
+            }
+
+            _stringBuilder.AppendLine();
+            return _stringBuilder;
+        }
+        private static string ToPascal(string text)
+        {
+            return Regex.Replace(text.Replace("_", " "), @"\b[a-z]", match => match.Value.ToUpper()).Replace(" ", "");
+        }
+
+        /*------------------------------Static Methods---------------------------------*/
+
+        private static string ExtractNameSpace(string oneLineText)
         {
             var matches = Regex.Matches(oneLineText, @"\s*namespace\s+[^\s]+\s+");
             if (matches.Count() <= 0) { return string.Empty; }
@@ -764,7 +862,7 @@ namespace Nuruwo.Tool
             return string.Empty;
         }
 
-        private string ExtractClassName(string oneLineText)
+        private static string ExtractClassName(string oneLineText)
         {
             var matches = Regex.Matches(oneLineText, @"\s*public\s+class\s+[^\s]+\s+:");
             if (matches.Count() <= 0) { return string.Empty; }
@@ -781,7 +879,7 @@ namespace Nuruwo.Tool
             return string.Empty;
         }
 
-        private List<string> ExtractFields(string oneLineText, string className)
+        private static List<string> ExtractFields(string oneLineText, string className)
         {
             var fields = new List<string>();
 
@@ -803,14 +901,9 @@ namespace Nuruwo.Tool
                     fields.AddRange(words);
                 }
             }
-
             return fields;
         }
-
-        private static string ToPascal(string text)
-        {
-            return Regex.Replace(text.Replace("_", " "), @"\b[a-z]", match => match.Value.ToUpper()).Replace(" ", "");
-        }
     }
+
 }
 #endif
