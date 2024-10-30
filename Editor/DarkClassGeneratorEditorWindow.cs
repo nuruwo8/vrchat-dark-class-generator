@@ -722,7 +722,9 @@ namespace Nuruwo.Tool
                 var dataTokenType = typeIsReference ? $".Reference" : $"";
 
                 AppendLine($"public static {argumentType} {pArgumentName}(this {_className} instance)");
+                Indent();
                 AppendLine($"=> ({argumentType})instance[(int){EnumName}.{pArgumentName}]{dataTokenType};");
+                Outdent();
             }
         }
 
@@ -738,7 +740,9 @@ namespace Nuruwo.Tool
                 var arg = typeIsReference ? $"new DataToken(arg)" : $"arg";
 
                 AppendLine($"public static void {pArgumentName}(this {_className} instance, {argumentType} arg)");
-                AppendLine($"\t=> instance[(int){EnumName}.{pArgumentName}] = {arg};");
+                Indent();
+                AppendLine($"=> instance[(int){EnumName}.{pArgumentName}] = {arg};");
+                Outdent();
             }
         }
 
