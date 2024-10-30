@@ -529,7 +529,7 @@ namespace Nuruwo.Tool
             }
 
             //second. other process.
-            var leftPreString = isArrayElement ? "\t" : "var ";
+            var leftPreString = isArrayElement ? "" : "var ";
             var leftPostString = isArrayElement ? "[i]" : "";
 
             //make StringBuilder. it should be one line to AppendLine() correctly.
@@ -543,7 +543,10 @@ namespace Nuruwo.Tool
             {
                 //custom enum
                 sb.Append($"({argumentType})(int){rightString}.Number;");
+
+                if (isArrayElement) { Indent(); }
                 AppendLine(sb.ToString());
+                if (isArrayElement) { Outdent(); }
                 return;
             }
 
@@ -592,7 +595,10 @@ namespace Nuruwo.Tool
                     }
                     break;
             }
+
+            if (isArrayElement) { Indent(); }
             AppendLine(sb.ToString());
+            if (isArrayElement) { Outdent(); }
             return;
         }
 
