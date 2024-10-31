@@ -572,11 +572,11 @@ namespace Nuruwo.Tool
 
         private bool CheckDataTokenTypeIsReference(string argumentType)
         {
-            var typeIsEnum = EnumTypeNames.Contains(argumentType) || _customEnumList.ToArray().Contains(argumentType);
             var typeIsArray = Regex.IsMatch(argumentType, @"\[\s*\]");
+            var typeIsEnum = EnumTypeNames.Contains(argumentType) || _customEnumList.ToArray().Contains(argumentType);
             var typeIsReference = ReferenceTypeNames.Contains(argumentType);
 
-            return typeIsEnum || typeIsArray || typeIsReference;
+            return typeIsArray || typeIsEnum || typeIsReference;
         }
 
         /*------------------------------String Utilities---------------------------------*/
