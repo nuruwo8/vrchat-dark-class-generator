@@ -10,244 +10,47 @@ using UnityEngine;
 
 namespace Nuruwo.Tool
 {
-    /// <summary>
-    /// Class to draw EditorWindow
-    /// </summary>
-    public class DarkClassGeneratorEditorWindow : EditorWindow
-    {
-        /*------------------------------private values----------------------------------*/
-        private bool _loadFoldIsOpen = false;
-        private bool _enumFoldIsOpen = false;
-
-        private bool _doGenerateSetMethod = true;
-        private bool _isJsonDeserializeMode = false;
-        private bool _deserializeVectorOrColorAsDataList = false;
-
-        private TextAsset _textAsset;
-        private string _prevScriptName = string.Empty;
-        private ReorderableList _reorderableFieldList;
-        private ReorderableList _reorderableEnumList;
-        private string _className = string.Empty;
-        private string _nameSpace = string.Empty;
-        private List<string> _fieldList = new List<string>() { "int value" };
-        private List<string> _enumList = new List<string>() { "UserEnum" };
-        private string _generatedCode = string.Empty;
-        private Vector2 _scrollPosition = Vector2.zero; //for textArea scroll
-
-        /*------------------------------Initialize------------------------------*/
-        [MenuItem("Tools/Nuruwo/DarkClassGenerator", false, 1)]
-        public static void Open()
-        {
-            var window = GetWindow<DarkClassGeneratorEditorWindow>();
-            window.titleContent = new GUIContent("Dark class generator");
-        }
-
-        private void OnEnable()
-        {
-            UpdateReorderableFieldList(_fieldList);
-            UpdateReorderableEnumList(_enumList);
-        }
-
-        /*------------------------------UI Look---------------------------------*/
-        private void OnGUI()
-        {
-            EditorGUILayout.Space(10);
-
-            DrawLoadFromScript();
-            EditorGUILayout.Space(10);
-
-            DrawClassParameters();
-            EditorGUILayout.Space(5);
-
-            DrawOptions();
-            EditorGUILayout.Space(5);
-
-            DrawGenerateButton();
-            EditorGUILayout.Space(10);
-
-            DrawTextArea();
-        }
-
-        /*------------------------------Draw methods---------------------------------*/
-        private void DrawLoadFromScript()
-        {
-            EditorGUILayout.BeginVertical(GUI.skin.box);
-            _loadFoldIsOpen = EditorGUILayout.Foldout(_loadFoldIsOpen, "Load class parameters from script");
-            if (_loadFoldIsOpen)
-            {
-                EditorGUI.indentLevel++;
-                EditorGUILayout.Space(10);
-                EditorGUILayout.BeginHorizontal();
-                _textAsset = (TextAsset)EditorGUILayout.ObjectField("Script to load", _textAsset, typeof(TextAsset), false);
-                var scriptName = _textAsset != null ? _textAsset.name : string.Empty;
-                if (!string.IsNullOrEmpty(scriptName) && _prevScriptName != scriptName)
-                {
-                    _prevScriptName = scriptName;   //script is changed
-                    (_nameSpace, _className, _fieldList) = DarkClassGenerator.LoadParameterFromScript(_textAsset.text);
-                    UpdateReorderableFieldList(_fieldList);
-                }
-                using (new EditorGUI.DisabledScope(string.IsNullOrEmpty(scriptName)))
-                {
-                    if (GUILayout.Button("Reload script"))
-                    {
-                        (_nameSpace, _className, _fieldList) = DarkClassGenerator.LoadParameterFromScript(_textAsset.text);
-                        UpdateReorderableFieldList(_fieldList);
-                    }
-                }
-                EditorGUILayout.EndHorizontal();
-                EditorGUILayout.Space(10);
-                EditorGUI.indentLevel--;
-            }
-            EditorGUILayout.EndVertical();
-        }
-
-        private void DrawClassParameters()
-        {
-            EditorGUILayout.BeginVertical(GUI.skin.box);
-            GUILayout.Label("Class parameters", EditorStyles.boldLabel);
-            EditorGUI.indentLevel++;
-
-            //namespace
-            EditorGUILayout.Space(10);
-            _nameSpace = EditorGUILayout.TextField("namespace (optional)", _nameSpace);
-            EditorGUILayout.Space(10);
-
-            //Class name
-            EditorGUILayout.Space(10);
-            _className = EditorGUILayout.TextField("Class name", _className);
-            EditorGUILayout.Space(10);
-
-            //Augment list
-            _reorderableFieldList.DoLayoutList();
-            EditorGUI.indentLevel--;
-            EditorGUILayout.EndVertical();
-        }
-
-        private void DrawOptions()
-        {
-            EditorGUILayout.BeginVertical(GUI.skin.box);
-            GUILayout.Label("Options");
-            EditorGUI.indentLevel++;
-            EditorGUILayout.Space(5);
-            _doGenerateSetMethod = EditorGUILayout.ToggleLeft(" Generate Set methods", _doGenerateSetMethod);
-            EditorGUILayout.Space(5);
-            _isJsonDeserializeMode = EditorGUILayout.ToggleLeft(" JSON deserialize mode (Experimental)", _isJsonDeserializeMode);
-            EditorGUILayout.Space(10);
-            _deserializeVectorOrColorAsDataList = EditorGUILayout.ToggleLeft(" Vector or Color as DataList in JSON", _deserializeVectorOrColorAsDataList);
-            EditorGUILayout.Space(5);
-
-            //custom enum
-            _enumFoldIsOpen = EditorGUILayout.Foldout(_enumFoldIsOpen, "Set user enum list");
-            if (_enumFoldIsOpen)
-            {
-                //Augment list
-                _reorderableEnumList.DoLayoutList();
-            }
-
-            EditorGUI.indentLevel--;
-            EditorGUILayout.EndVertical();
-        }
-
-        private void DrawGenerateButton()
-        {
-            var canGenerate = !string.IsNullOrEmpty(_className) && _fieldList.Count > 0 && !string.IsNullOrEmpty(_fieldList[0]);
-
-            var result = string.Empty;
-
-            using (new EditorGUI.DisabledScope(!canGenerate))
-            {
-                //Generate 
-                if (GUILayout.Button("Generate DarkClass"))
-                {
-                    var generator = new DarkClassGenerator(
-                        _nameSpace,
-                        _className,
-                        _fieldList,
-                        _enumList,
-                        _doGenerateSetMethod,
-                        _deserializeVectorOrColorAsDataList,
-                        _isJsonDeserializeMode,
-                        "\t"
-                    );
-                    _generatedCode = generator.GenerateDarkClassCode();
-                    //clip board
-                    EditorGUIUtility.systemCopyBuffer = _generatedCode;
-                    result = "Code is generated and Copied to clipboard.";
-                }
-            }
-            GUILayout.Label(result);
-        }
-
-        private void DrawTextArea()
-        {
-            _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition);
-            var textAreaStyle = new GUIStyle(EditorStyles.textArea)
-            {
-                wordWrap = true
-            };
-            GUILayout.TextArea(_generatedCode, textAreaStyle);
-            EditorGUILayout.EndScrollView();
-        }
-
-        /*------------------------------Reorderable List---------------------------------*/
-        private void UpdateReorderableFieldList(List<string> list)
-        {
-            _fieldList = list;
-            _reorderableFieldList = new ReorderableList(
-              elements: _fieldList,
-              elementType: typeof(string),
-              draggable: true,
-              displayHeader: true,
-              displayAddButton: true,
-              displayRemoveButton: true
-            );
-            _reorderableFieldList.drawHeaderCallback = rect => EditorGUI.LabelField(rect, "Field List");
-            _reorderableFieldList.elementHeightCallback = index => 20;
-            _reorderableFieldList.drawElementCallback = (rect, index, isActive, isFocused) =>
-            {
-                _fieldList[index] = EditorGUI.TextField(rect, "  Field (type and name) " + index, _fieldList[index]);
-            };
-        }
-
-        private void UpdateReorderableEnumList(List<string> list)
-        {
-            _enumList = list;
-            _reorderableEnumList = new ReorderableList(
-              elements: _enumList,
-              elementType: typeof(string),
-              draggable: true,
-              displayHeader: true,
-              displayAddButton: true,
-              displayRemoveButton: true
-            );
-            _reorderableEnumList.drawHeaderCallback = rect => EditorGUI.LabelField(rect, "Enum List");
-            _reorderableEnumList.elementHeightCallback = index => 20;
-            _reorderableEnumList.drawElementCallback = (rect, index, isActive, isFocused) =>
-            {
-                _enumList[index] = EditorGUI.TextField(rect, "  Enum type " + index, _enumList[index]);
-            };
-        }
-    }
 
     /// <summary>
     /// Class to Generate DarkClass and LoadScript
     /// </summary>
     internal class DarkClassGenerator
     {
-        /*------------------------------private values----------------------------------*/
+        /*--------------------const values you can add the types----------------------*/
+        private string[] ReferenceTypeNames = new string[]
+        {
+            "Vector2",
+            "Vector3",
+            "Vector4",
+            "Quaternion",
+            "Color",
+            "Color32",
+        };
+
+        private string[] EnumTypeNames = new string[]
+        {
+            "TrackingDataType",
+            "HumanBodyBones",
+            "TextureWrapMode",
+            "GraphicsFormat",
+            "TextureFormat",
+        };
+
+        /*------------------------------private types----------------------------------*/
         private enum VectorOrColor
         {
             VECTOR,
             COLOR
         }
 
+        /*------------------------------private values----------------------------------*/
         private readonly StringBuilder _stringBuilder;
         private int _indentLevel;
 
         private readonly string _nameSpace;
         private readonly string _className;
         private readonly List<string> _fieldList;
-        private readonly List<string> _enumList;
+        private readonly List<string> _customEnumList;
         private readonly string _indentStringUnit;
         private readonly bool _doGenerateSetMethod;
         private readonly bool _deserializeVectorOrColorAsDataList;
@@ -272,7 +75,7 @@ namespace Nuruwo.Tool
             _nameSpace = nameSpace;
             _className = className;
             _fieldList = fieldList;
-            _enumList = enumList;
+            _customEnumList = enumList;
             _doGenerateSetMethod = doGenerateSetMethod;
             _deserializeVectorOrColorAsDataList = deserializeVectorOrColorAsDataList;
             _isJsonDeserializeMode = isJsonDeserializeMode;
@@ -538,10 +341,9 @@ namespace Nuruwo.Tool
             var rightString = isArrayElement ? $"{argumentName}List[i]" : $"dic[\"{jsonKey}\"]";
 
             //check option Enum
-            var typeIsEnum = _enumList.ToArray().Contains(argumentType);
+            var typeIsEnum = EnumTypeNames.Contains(argumentType) || _customEnumList.ToArray().Contains(argumentType);
             if (typeIsEnum)
             {
-                //custom enum
                 sb.Append($"({argumentType})(int){rightString}.Number;");
 
                 if (isArrayElement) { Indent(); }
@@ -573,15 +375,8 @@ namespace Nuruwo.Tool
                 case "ushort":
                 case "float":
                 case "double":
+                    //number
                     sb.Append($"({argumentType}){rightString}.Number;");
-                    break;
-                case "TrackingDataType":
-                case "HumanBodyBones":
-                case "TextureWrapMode":
-                case "GraphicsFormat":
-                case "TextureFormat":
-                    //normal enum
-                    sb.Append($"({argumentType})(int){rightString}.Number;");
                     break;
                 default:
                     //Dark class
@@ -715,7 +510,6 @@ namespace Nuruwo.Tool
             AppendLine($"}}");
         }
 
-
         private void GenerateGetMethods()
         {
             foreach (var field in _fieldList)
@@ -778,35 +572,11 @@ namespace Nuruwo.Tool
 
         private bool CheckDataTokenTypeIsReference(string argumentType)
         {
-            var typeIsEnum = _enumList.ToArray().Contains(argumentType);
-            if (typeIsEnum)
-            {
-                //user enum type is Reference
-                return true;
-            }
+            var typeIsEnum = EnumTypeNames.Contains(argumentType) || _customEnumList.ToArray().Contains(argumentType);
+            var typeIsArray = Regex.IsMatch(argumentType, @"\[\s*\]");
+            var typeIsReference = ReferenceTypeNames.Contains(argumentType);
 
-            if (Regex.IsMatch(argumentType, @"\[\s*\]"))
-            {
-                //array is reference
-                return true;
-            }
-
-            //You can add more types
-            var referenceCastTypes = new string[]{
-                "TrackingDataType",
-                "HumanBodyBones",
-                "TextureWrapMode",
-                "GraphicsFormat",
-                "TextureFormat",
-                "Vector2",
-                "Vector3",
-                "Vector4",
-                "Quaternion",
-                "Color",
-                "Color32",
-            };
-
-            return Array.IndexOf(referenceCastTypes, argumentType) != -1;   //if type is find in array. return true;
+            return typeIsEnum || typeIsArray || typeIsReference;
         }
 
         /*------------------------------String Utilities---------------------------------*/
@@ -914,6 +684,225 @@ namespace Nuruwo.Tool
                 }
             }
             return fields;
+        }
+    }
+
+    /// <summary>
+    /// Class to draw EditorWindow
+    /// </summary>
+    public class DarkClassGeneratorEditorWindow : EditorWindow
+    {
+        /*------------------------------private values----------------------------------*/
+        private bool _loadFoldIsOpen = false;
+        private bool _enumFoldIsOpen = false;
+
+        private bool _doGenerateSetMethod = true;
+        private bool _isJsonDeserializeMode = false;
+        private bool _deserializeVectorOrColorAsDataList = false;
+
+        private TextAsset _textAsset;
+        private string _prevScriptName = string.Empty;
+        private ReorderableList _reorderableFieldList;
+        private ReorderableList _reorderableEnumList;
+        private string _className = string.Empty;
+        private string _nameSpace = string.Empty;
+        private List<string> _fieldList = new List<string>() { "int value" };
+        private List<string> _enumList = new List<string>() { "UserEnum" };
+        private string _generatedCode = string.Empty;
+        private Vector2 _scrollPosition = Vector2.zero; //for textArea scroll
+
+        /*------------------------------Initialize------------------------------*/
+        [MenuItem("Tools/Nuruwo/DarkClassGenerator", false, 1)]
+        public static void Open()
+        {
+            var window = GetWindow<DarkClassGeneratorEditorWindow>();
+            window.titleContent = new GUIContent("Dark class generator");
+        }
+
+        private void OnEnable()
+        {
+            UpdateReorderableFieldList(_fieldList);
+            UpdateReorderableEnumList(_enumList);
+        }
+
+        /*------------------------------UI Look---------------------------------*/
+        private void OnGUI()
+        {
+            EditorGUILayout.Space(10);
+
+            DrawLoadFromScript();
+            EditorGUILayout.Space(10);
+
+            DrawClassParameters();
+            EditorGUILayout.Space(5);
+
+            DrawOptions();
+            EditorGUILayout.Space(5);
+
+            DrawGenerateButton();
+            EditorGUILayout.Space(10);
+
+            DrawTextArea();
+        }
+
+        /*------------------------------Draw methods---------------------------------*/
+        private void DrawLoadFromScript()
+        {
+            EditorGUILayout.BeginVertical(GUI.skin.box);
+            _loadFoldIsOpen = EditorGUILayout.Foldout(_loadFoldIsOpen, "Load class parameters from script");
+            if (_loadFoldIsOpen)
+            {
+                EditorGUI.indentLevel++;
+                EditorGUILayout.Space(10);
+                EditorGUILayout.BeginHorizontal();
+                _textAsset = (TextAsset)EditorGUILayout.ObjectField("Script to load", _textAsset, typeof(TextAsset), false);
+                var scriptName = _textAsset != null ? _textAsset.name : string.Empty;
+                if (!string.IsNullOrEmpty(scriptName) && _prevScriptName != scriptName)
+                {
+                    _prevScriptName = scriptName;   //script is changed
+                    (_nameSpace, _className, _fieldList) = DarkClassGenerator.LoadParameterFromScript(_textAsset.text);
+                    UpdateReorderableFieldList(_fieldList);
+                }
+                using (new EditorGUI.DisabledScope(string.IsNullOrEmpty(scriptName)))
+                {
+                    if (GUILayout.Button("Reload script"))
+                    {
+                        (_nameSpace, _className, _fieldList) = DarkClassGenerator.LoadParameterFromScript(_textAsset.text);
+                        UpdateReorderableFieldList(_fieldList);
+                    }
+                }
+                EditorGUILayout.EndHorizontal();
+                EditorGUILayout.Space(10);
+                EditorGUI.indentLevel--;
+            }
+            EditorGUILayout.EndVertical();
+        }
+
+        private void DrawClassParameters()
+        {
+            EditorGUILayout.BeginVertical(GUI.skin.box);
+            GUILayout.Label("Class parameters", EditorStyles.boldLabel);
+            EditorGUI.indentLevel++;
+
+            //namespace
+            EditorGUILayout.Space(10);
+            _nameSpace = EditorGUILayout.TextField("namespace (optional)", _nameSpace);
+            EditorGUILayout.Space(10);
+
+            //Class name
+            EditorGUILayout.Space(10);
+            _className = EditorGUILayout.TextField("Class name", _className);
+            EditorGUILayout.Space(10);
+
+            //Augment list
+            _reorderableFieldList.DoLayoutList();
+            EditorGUI.indentLevel--;
+            EditorGUILayout.EndVertical();
+        }
+
+        private void DrawOptions()
+        {
+            EditorGUILayout.BeginVertical(GUI.skin.box);
+            GUILayout.Label("Options");
+            EditorGUI.indentLevel++;
+            EditorGUILayout.Space(5);
+            _doGenerateSetMethod = EditorGUILayout.ToggleLeft(" Generate Set methods", _doGenerateSetMethod);
+            EditorGUILayout.Space(5);
+            _isJsonDeserializeMode = EditorGUILayout.ToggleLeft(" JSON deserialize mode (Experimental)", _isJsonDeserializeMode);
+            EditorGUILayout.Space(10);
+            _deserializeVectorOrColorAsDataList = EditorGUILayout.ToggleLeft(" Vector or Color as DataList in JSON", _deserializeVectorOrColorAsDataList);
+            EditorGUILayout.Space(5);
+
+            //custom enum
+            _enumFoldIsOpen = EditorGUILayout.Foldout(_enumFoldIsOpen, "Set user enum list");
+            if (_enumFoldIsOpen)
+            {
+                //Augment list
+                _reorderableEnumList.DoLayoutList();
+            }
+
+            EditorGUI.indentLevel--;
+            EditorGUILayout.EndVertical();
+        }
+
+        private void DrawGenerateButton()
+        {
+            var canGenerate = !string.IsNullOrEmpty(_className) && _fieldList.Count > 0 && !string.IsNullOrEmpty(_fieldList[0]);
+
+            var result = string.Empty;
+
+            using (new EditorGUI.DisabledScope(!canGenerate))
+            {
+                //Generate 
+                if (GUILayout.Button("Generate DarkClass"))
+                {
+                    var generator = new DarkClassGenerator(
+                        _nameSpace,
+                        _className,
+                        _fieldList,
+                        _enumList,
+                        _doGenerateSetMethod,
+                        _deserializeVectorOrColorAsDataList,
+                        _isJsonDeserializeMode,
+                        "\t"
+                    );
+                    _generatedCode = generator.GenerateDarkClassCode();
+                    //clip board
+                    EditorGUIUtility.systemCopyBuffer = _generatedCode;
+                    result = "Code is generated and Copied to clipboard.";
+                }
+            }
+            GUILayout.Label(result);
+        }
+
+        private void DrawTextArea()
+        {
+            _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition);
+            var textAreaStyle = new GUIStyle(EditorStyles.textArea)
+            {
+                wordWrap = true
+            };
+            GUILayout.TextArea(_generatedCode, textAreaStyle);
+            EditorGUILayout.EndScrollView();
+        }
+
+        /*------------------------------Reorderable List---------------------------------*/
+        private void UpdateReorderableFieldList(List<string> list)
+        {
+            _fieldList = list;
+            _reorderableFieldList = new ReorderableList(
+              elements: _fieldList,
+              elementType: typeof(string),
+              draggable: true,
+              displayHeader: true,
+              displayAddButton: true,
+              displayRemoveButton: true
+            );
+            _reorderableFieldList.drawHeaderCallback = rect => EditorGUI.LabelField(rect, "Field List");
+            _reorderableFieldList.elementHeightCallback = index => 20;
+            _reorderableFieldList.drawElementCallback = (rect, index, isActive, isFocused) =>
+            {
+                _fieldList[index] = EditorGUI.TextField(rect, "  Field (type and name) " + index, _fieldList[index]);
+            };
+        }
+
+        private void UpdateReorderableEnumList(List<string> list)
+        {
+            _enumList = list;
+            _reorderableEnumList = new ReorderableList(
+              elements: _enumList,
+              elementType: typeof(string),
+              draggable: true,
+              displayHeader: true,
+              displayAddButton: true,
+              displayRemoveButton: true
+            );
+            _reorderableEnumList.drawHeaderCallback = rect => EditorGUI.LabelField(rect, "Enum List");
+            _reorderableEnumList.elementHeightCallback = index => 20;
+            _reorderableEnumList.drawElementCallback = (rect, index, isActive, isFocused) =>
+            {
+                _enumList[index] = EditorGUI.TextField(rect, "  Enum type " + index, _enumList[index]);
+            };
         }
     }
 
