@@ -136,7 +136,6 @@ namespace Nuruwo.Tool
 
             if (HasNameSpace)
             {
-                AppendLine();
                 Outdent();
                 AppendLine($"}}");
             }
