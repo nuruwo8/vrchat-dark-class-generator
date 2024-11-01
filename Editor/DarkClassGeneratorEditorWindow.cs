@@ -164,7 +164,6 @@ namespace Nuruwo.Tool
         /*-----------------------Main class scope--------------------------------*/
         private void GenerateMainClassScope()
         {
-            AppendLine($"[AddComponentMenu(\"\")]");
             AppendLine($"public class {_className} : DataList");
             AppendLine($"{{");
             Indent();
