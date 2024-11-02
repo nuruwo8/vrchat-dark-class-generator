@@ -801,14 +801,14 @@ namespace Nuruwo.Tool
         private void DrawOptions()
         {
             EditorGUILayout.BeginVertical(GUI.skin.box);
-            GUILayout.Label("Options");
+            GUILayout.Label("Options", EditorStyles.boldLabel);
             EditorGUI.indentLevel++;
             EditorGUILayout.Space(5);
             _doGenerateSetMethod = EditorGUILayout.ToggleLeft(" Generate Set methods", _doGenerateSetMethod);
             EditorGUILayout.Space(5);
-            _isJsonDeserializeMode = EditorGUILayout.ToggleLeft(" JSON deserialize mode (Experimental)", _isJsonDeserializeMode);
+            _isJsonDeserializeMode = EditorGUILayout.ToggleLeft(" JSON deserialize mode", _isJsonDeserializeMode);
             EditorGUILayout.Space(10);
-            _deserializeVectorOrColorAsDataList = EditorGUILayout.ToggleLeft(" Vector or Color as DataList in JSON", _deserializeVectorOrColorAsDataList);
+            _deserializeVectorOrColorAsDataList = EditorGUILayout.ToggleLeft(" In JSON mode, Vector or Color as DataList", _deserializeVectorOrColorAsDataList);
             EditorGUILayout.Space(5);
 
             //custom enum
