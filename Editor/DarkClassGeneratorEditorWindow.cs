@@ -326,11 +326,23 @@ namespace Nuruwo.Tool
             sb.Append($"{leftPreString}{argumentName}{leftPostString} = ");
             var rightString = isArrayElement ? $"{argumentName}List[i]" : $"dic[\"{jsonKey}\"]";
 
-            //check option Enum
+            //check Enum
             var typeIsEnum = CheckTypeIsEnum(argumentType);
             if (typeIsEnum)
             {
                 sb.Append($"({argumentType})(int){rightString}.Number;");
+
+                if (isArrayElement) { Indent(); }
+                AppendLine(sb.ToString());
+                if (isArrayElement) { Outdent(); }
+                return;
+            }
+
+            //check reference
+            var typeIsReference = CheckDataTokenTypeIsReference(argumentType);
+            if (typeIsReference)
+            {
+                sb.Append($"{rightString}.Reference;");
 
                 if (isArrayElement) { Indent(); }
                 AppendLine(sb.ToString());
@@ -876,6 +888,5 @@ namespace Nuruwo.Tool
             };
         }
     }
-
 }
 #endif
