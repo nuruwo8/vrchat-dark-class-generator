@@ -7,6 +7,7 @@ using System.Text.RegularExpressions;
 using UnityEditor;
 using UnityEditorInternal;
 using UnityEngine;
+using VRC.SDK3.Data;
 
 namespace Nuruwo.Tool
 {
@@ -16,26 +17,6 @@ namespace Nuruwo.Tool
     /// </summary>
     internal class DarkClassGenerator
     {
-        /*--------------------const values you can add the types----------------------*/
-        private string[] ReferenceTypeNames = new string[]
-        {
-            "Vector2",
-            "Vector3",
-            "Vector4",
-            "Quaternion",
-            "Color",
-            "Color32",
-        };
-
-        private string[] EnumTypeNames = new string[]
-        {
-            "TrackingDataType",
-            "HumanBodyBones",
-            "TextureWrapMode",
-            "GraphicsFormat",
-            "TextureFormat",
-        };
-
         /*------------------------------private types----------------------------------*/
         private enum VectorOrColor
         {
@@ -55,9 +36,11 @@ namespace Nuruwo.Tool
         private readonly bool _doGenerateSetMethod;
         private readonly bool _deserializeVectorOrColorAsDataList;
         private readonly bool _isJsonDeserializeMode;
+        private readonly Type[] _assemblyTypes;
 
         private string EnumName => $"{_className}Field";
         private bool HasNameSpace => !string.IsNullOrEmpty(_nameSpace);
+
 
         /*------------------------------Constructor------------------------------*/
         public DarkClassGenerator(
@@ -80,6 +63,15 @@ namespace Nuruwo.Tool
             _deserializeVectorOrColorAsDataList = deserializeVectorOrColorAsDataList;
             _isJsonDeserializeMode = isJsonDeserializeMode;
             _indentStringUnit = indentStringUnit;
+
+            //get all types in current assembly
+            var typeList = new List<Type>();
+            var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+            foreach (var assembly in assemblies)
+            {
+                typeList.AddRange(assembly.GetTypes());
+            }
+            _assemblyTypes = typeList.ToArray();
         }
 
         /*------------------------------Public methods------------------------------*/
@@ -96,7 +88,6 @@ namespace Nuruwo.Tool
 
         public static (string nameSpace, string className, List<string> fieldList) LoadParameterFromScript(string text)
         {
-            Debug.Log("LoadScript: " + text);
             var oneLineText = text.Replace("\r\n", "\n").Replace("\n", " "); //remove line break and join with space
 
             //namespace
@@ -339,7 +330,7 @@ namespace Nuruwo.Tool
             var rightString = isArrayElement ? $"{argumentName}List[i]" : $"dic[\"{jsonKey}\"]";
 
             //check option Enum
-            var typeIsEnum = EnumTypeNames.Contains(argumentType) || _customEnumList.ToArray().Contains(argumentType);
+            var typeIsEnum = CheckTypeIsEnum(argumentType);
             if (typeIsEnum)
             {
                 sb.Append($"({argumentType})(int){rightString}.Number;");
@@ -355,7 +346,7 @@ namespace Nuruwo.Tool
             {
                 case "bool":
                     sb.Append($"{rightString}.Boolean;");
-                    return;
+                    break;
                 case "char":
                     sb.Append($"{rightString}.String[0];");
                     break;
@@ -571,10 +562,31 @@ namespace Nuruwo.Tool
         private bool CheckDataTokenTypeIsReference(string argumentType)
         {
             var typeIsArray = Regex.IsMatch(argumentType, @"\[\s*\]");
-            var typeIsEnum = EnumTypeNames.Contains(argumentType) || _customEnumList.ToArray().Contains(argumentType);
-            var typeIsReference = ReferenceTypeNames.Contains(argumentType);
+            var typeIsReference = false;
 
-            return typeIsArray || typeIsEnum || typeIsReference;
+            var type = _assemblyTypes.FirstOrDefault(t => t.Name == argumentType);
+            if (type != null)
+            {
+                if (type.IsValueType)
+                {
+                    typeIsReference = new DataToken(Activator.CreateInstance(type)).TokenType == TokenType.Reference;
+                }
+            }
+
+            return typeIsArray || typeIsReference;
+        }
+
+        private bool CheckTypeIsEnum(string argumentType)
+        {
+            var typeIsEnum = false;
+
+            var type = _assemblyTypes.FirstOrDefault(t => t.Name == argumentType);
+            if (type != null)
+            {
+                typeIsEnum = type.IsEnum;
+            }
+
+            return typeIsEnum;
         }
 
         /*------------------------------String Utilities---------------------------------*/
@@ -674,10 +686,6 @@ namespace Nuruwo.Tool
                 var words = Regex.Split(src, @"\s*,\s*");
                 if (words.Length > 0)
                 {
-                    foreach (var word in words)
-                    {
-                        Debug.Log(word);
-                    }
                     fields.AddRange(words);
                 }
             }
