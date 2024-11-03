@@ -1,3 +1,5 @@
+//#define LOAD_SCRIPT_BY_TEXTAREA
+
 #if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
@@ -721,7 +723,13 @@ namespace Nuruwo.Tool
         private string _nameSpace = string.Empty;
         private List<string> _fieldList = new List<string>() { "int value" };
         private string _generatedCode = string.Empty;
-        private Vector2 _scrollPosition = Vector2.zero; //for textArea scroll
+        private Vector2 _scrollPositionResult = Vector2.zero; //for textArea scroll
+
+
+#if LOAD_SCRIPT_BY_TEXTAREA
+        private Vector2 _scrollPositionScript = Vector2.zero; //for textArea scroll
+        private string _scriptText = string.Empty;
+#endif
 
         /*------------------------------Initialize------------------------------*/
         [MenuItem("Tools/Nuruwo/DarkClassGenerator", false, 1)]
@@ -784,6 +792,26 @@ namespace Nuruwo.Tool
                 }
                 EditorGUILayout.EndHorizontal();
                 EditorGUILayout.Space(10);
+
+#if LOAD_SCRIPT_BY_TEXTAREA
+                EditorGUILayout.Space(10);
+                GUILayout.Label("Load parameters from text", EditorStyles.boldLabel);
+                EditorGUILayout.Space(10);
+                _scrollPositionScript = EditorGUILayout.BeginScrollView(_scrollPositionScript);
+                var textAreaStyle = new GUIStyle(EditorStyles.textArea)
+                {
+                    wordWrap = true
+                };
+                _scriptText = GUILayout.TextArea(_scriptText, textAreaStyle);
+                EditorGUILayout.EndScrollView();
+                EditorGUILayout.Space(10);
+                if (GUILayout.Button("Load script"))
+                {
+                    (_nameSpace, _className, _fieldList) = DarkClassGenerator.LoadParameterFromScript(_scriptText);
+                    UpdateReorderableFieldList(_fieldList);
+                }
+                EditorGUILayout.Space(10);
+#endif
                 EditorGUI.indentLevel--;
             }
             EditorGUILayout.EndVertical();
@@ -859,7 +887,7 @@ namespace Nuruwo.Tool
 
         private void DrawTextArea()
         {
-            _scrollPosition = EditorGUILayout.BeginScrollView(_scrollPosition);
+            _scrollPositionResult = EditorGUILayout.BeginScrollView(_scrollPositionResult);
             var textAreaStyle = new GUIStyle(EditorStyles.textArea)
             {
                 wordWrap = true
