@@ -31,7 +31,6 @@ namespace Nuruwo.Tool
         private readonly string _nameSpace;
         private readonly string _className;
         private readonly List<string> _fieldList;
-        private readonly List<string> _customEnumList;
         private readonly string _indentStringUnit;
         private readonly bool _doGenerateSetMethod;
         private readonly bool _deserializeVectorOrColorAsDataList;
@@ -47,7 +46,6 @@ namespace Nuruwo.Tool
             string nameSpace,
             string className,
             List<string> fieldList,
-            List<string> enumList,
             bool doGenerateSetMethod = true,
             bool deserializeVectorOrColorAsDataList = false,
             bool isJsonDeserializeMode = false,
@@ -58,7 +56,6 @@ namespace Nuruwo.Tool
             _nameSpace = nameSpace;
             _className = className;
             _fieldList = fieldList;
-            _customEnumList = enumList;
             _doGenerateSetMethod = doGenerateSetMethod;
             _deserializeVectorOrColorAsDataList = deserializeVectorOrColorAsDataList;
             _isJsonDeserializeMode = isJsonDeserializeMode;
@@ -700,7 +697,6 @@ namespace Nuruwo.Tool
     {
         /*------------------------------private values----------------------------------*/
         private bool _loadFoldIsOpen = false;
-        private bool _enumFoldIsOpen = false;
 
         private bool _doGenerateSetMethod = true;
         private bool _isJsonDeserializeMode = false;
@@ -709,11 +705,9 @@ namespace Nuruwo.Tool
         private TextAsset _textAsset;
         private string _prevScriptName = string.Empty;
         private ReorderableList _reorderableFieldList;
-        private ReorderableList _reorderableEnumList;
         private string _className = string.Empty;
         private string _nameSpace = string.Empty;
         private List<string> _fieldList = new List<string>() { "int value" };
-        private List<string> _enumList = new List<string>() { "UserEnum" };
         private string _generatedCode = string.Empty;
         private Vector2 _scrollPosition = Vector2.zero; //for textArea scroll
 
@@ -728,7 +722,6 @@ namespace Nuruwo.Tool
         private void OnEnable()
         {
             UpdateReorderableFieldList(_fieldList);
-            UpdateReorderableEnumList(_enumList);
         }
 
         /*------------------------------UI Look---------------------------------*/
@@ -819,14 +812,6 @@ namespace Nuruwo.Tool
             _deserializeVectorOrColorAsDataList = EditorGUILayout.ToggleLeft(" In JSON mode, Vector or Color as DataList", _deserializeVectorOrColorAsDataList);
             EditorGUILayout.Space(5);
 
-            //custom enum
-            _enumFoldIsOpen = EditorGUILayout.Foldout(_enumFoldIsOpen, "Set user enum list");
-            if (_enumFoldIsOpen)
-            {
-                //Augment list
-                _reorderableEnumList.DoLayoutList();
-            }
-
             EditorGUI.indentLevel--;
             EditorGUILayout.EndVertical();
         }
@@ -846,7 +831,6 @@ namespace Nuruwo.Tool
                         _nameSpace,
                         _className,
                         _fieldList,
-                        _enumList,
                         _doGenerateSetMethod,
                         _deserializeVectorOrColorAsDataList,
                         _isJsonDeserializeMode,
@@ -889,25 +873,6 @@ namespace Nuruwo.Tool
             _reorderableFieldList.drawElementCallback = (rect, index, isActive, isFocused) =>
             {
                 _fieldList[index] = EditorGUI.TextField(rect, "  Field (type and name) " + index, _fieldList[index]);
-            };
-        }
-
-        private void UpdateReorderableEnumList(List<string> list)
-        {
-            _enumList = list;
-            _reorderableEnumList = new ReorderableList(
-              elements: _enumList,
-              elementType: typeof(string),
-              draggable: true,
-              displayHeader: true,
-              displayAddButton: true,
-              displayRemoveButton: true
-            );
-            _reorderableEnumList.drawHeaderCallback = rect => EditorGUI.LabelField(rect, "Enum List");
-            _reorderableEnumList.elementHeightCallback = index => 20;
-            _reorderableEnumList.drawElementCallback = (rect, index, isActive, isFocused) =>
-            {
-                _enumList[index] = EditorGUI.TextField(rect, "  Enum type " + index, _enumList[index]);
             };
         }
     }
