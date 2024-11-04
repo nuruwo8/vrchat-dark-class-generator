@@ -1,15 +1,18 @@
-//#define LOAD_SCRIPT_BY_TEXTAREA
+//#define DARK_CLASS_GENERATOR_LOAD_BY_TEXTAREA
 
 #if UNITY_EDITOR
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
+using UdonSharp;
 using UnityEditor;
 using UnityEditorInternal;
 using UnityEngine;
 using VRC.SDK3.Data;
+using VRC.Udon.Editor;
 
 namespace Nuruwo.Tool
 {
@@ -63,12 +66,15 @@ namespace Nuruwo.Tool
             _isJsonDeserializeMode = isJsonDeserializeMode;
             _indentStringUnit = indentStringUnit;
 
-            //get all types in current assembly
+            //Extract Valid Udon types from all assemblies.
             var typeList = new List<Type>();
             var assemblies = AppDomain.CurrentDomain.GetAssemblies();
+            var udonSharpEditorAssembly = Assembly.Load("UdonSharp.Editor");
+            var compilerUdonInterface = udonSharpEditorAssembly.GetType("UdonSharp.Compiler.Udon.CompilerUdonInterface");
+            var getUdonTypeName = compilerUdonInterface.GetMethod("GetUdonTypeName", new Type[] { typeof(Type) });
             foreach (var assembly in assemblies)
             {
-                typeList.AddRange(assembly.GetTypes());
+                typeList.AddRange(assembly.GetTypes().Where(t => t.IsEnum || t.IsSubclassOf(typeof(UdonSharpBehaviour)) || t.IsSubclassOf(typeof(DataList)) || t.IsSubclassOf(typeof(DataDictionary)) || UdonEditorManager.Instance.GetTypeFromTypeString((string)getUdonTypeName.Invoke(null, new object[] { t })) != null));
             }
             _assemblyTypes = typeList.ToArray();
         }
@@ -344,7 +350,7 @@ namespace Nuruwo.Tool
             var typeIsReference = CheckDataTokenTypeIsReference(argumentType);
             if (typeIsReference)
             {
-                sb.Append($"{rightString}.Reference;");
+                sb.Append($"({argumentType}){rightString}.Reference;");
 
                 if (isArrayElement) { Indent(); }
                 AppendLine(sb.ToString());
@@ -352,7 +358,6 @@ namespace Nuruwo.Tool
                 return;
             }
 
-            //switch with arg type
             switch (argumentType)
             {
                 case "bool":
@@ -377,6 +382,10 @@ namespace Nuruwo.Tool
                 case "double":
                     //number
                     sb.Append($"({argumentType}){rightString}.Number;");
+                    break;
+                case "DataList":
+                case "DataDictionary":
+                    sb.Append($"{rightString}.{argumentType};");
                     break;
                 default:
                     //Dark class
@@ -573,19 +582,50 @@ namespace Nuruwo.Tool
         private bool CheckDataTokenTypeIsReference(string argumentType)
         {
             var typeIsArray = Regex.IsMatch(argumentType, @"\[\s*\]");
-            var typeIsReference = false;
+            var typeIsReference = argumentType == "object" || argumentType == "decimal";
 
-            var type = _assemblyTypes.FirstOrDefault(t => t.Name == argumentType);
+            var types = _assemblyTypes.Where(t => t.Name == argumentType);
+            var type = types.FirstOrDefault(t => t.IsSubclassOf(typeof(DataList))) ?? types.FirstOrDefault();
+
             if (type != null)
             {
-                if (type.IsValueType)
+                if (type.IsSubclassOf(typeof(UnityEngine.Object)) || type.IsEnum || type.IsInterface) typeIsReference = true;
+                else if (type != typeof(DataList) && !type.IsSubclassOf(typeof(DataList)) && type != typeof(DataDictionary) && !type.IsSubclassOf(typeof(DataDictionary)))
                 {
-                    typeIsReference = new DataToken(Activator.CreateInstance(type)).TokenType == TokenType.Reference;
+                    object instance = null;
+                    try
+                    {
+                        instance = Activator.CreateInstance(type);
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.LogWarning(e);
+                        typeIsReference = true;
+                    }
+                    if (instance != null)
+                    {
+                        var data = CreateDataTokenInstance(type, instance);
+                        typeIsReference = data.TokenType == TokenType.Reference;
+                    }
                 }
             }
 
             return typeIsArray || typeIsReference;
         }
+
+        private DataToken CreateDataTokenInstance(Type type, object value)
+        {
+            var dataTokenType = typeof(DataToken);
+            var constructor = dataTokenType.GetConstructor(new Type[] { type });
+
+            if (constructor == null)
+            {
+                return new DataToken(value);
+            }
+
+            return (DataToken)constructor.Invoke(new object[] { value });
+        }
+
 
         private bool CheckTypeIsEnum(string argumentType)
         {
@@ -723,10 +763,11 @@ namespace Nuruwo.Tool
         private string _nameSpace = string.Empty;
         private List<string> _fieldList = new List<string>() { "int value" };
         private string _generatedCode = string.Empty;
+        private Vector2 _scrollPositionOnGui = Vector2.zero; //for OnGUI scroll
         private Vector2 _scrollPositionResult = Vector2.zero; //for textArea scroll
 
 
-#if LOAD_SCRIPT_BY_TEXTAREA
+#if DARK_CLASS_GENERATOR_LOAD_BY_TEXTAREA
         private Vector2 _scrollPositionScript = Vector2.zero; //for textArea scroll
         private string _scriptText = string.Empty;
 #endif
@@ -747,6 +788,8 @@ namespace Nuruwo.Tool
         /*------------------------------UI Look---------------------------------*/
         private void OnGUI()
         {
+            _scrollPositionOnGui = EditorGUILayout.BeginScrollView(_scrollPositionOnGui);
+
             EditorGUILayout.Space(10);
 
             DrawLoadFromScript();
@@ -762,6 +805,8 @@ namespace Nuruwo.Tool
             EditorGUILayout.Space(10);
 
             DrawTextArea();
+
+            EditorGUILayout.EndScrollView();
         }
 
         /*------------------------------Draw methods---------------------------------*/
@@ -793,7 +838,7 @@ namespace Nuruwo.Tool
                 EditorGUILayout.EndHorizontal();
                 EditorGUILayout.Space(10);
 
-#if LOAD_SCRIPT_BY_TEXTAREA
+#if DARK_CLASS_GENERATOR_LOAD_BY_TEXTAREA
                 EditorGUILayout.Space(10);
                 GUILayout.Label("Load parameters from text", EditorStyles.boldLabel);
                 EditorGUILayout.Space(10);
