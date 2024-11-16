@@ -1,0 +1,14 @@
+{
+    "name": "com.nuruwo8.dark-class-generator",
+    "version": "2.6.0",
+    "displayName": "DarkClass Generator",
+    "description": "DarkClass is to make your custom Class in UdonSharp.",
+    "unity": "2022.3",
+    "documentationUrl": "https://github.com/nuruwo8/vrchat-dark-class-generator/tree/",
+    "changelogUrl": "https://github.com/nuruwo8/vrchat-dark-class-generator/commits/",
+    "licensesUrl": "https://github.com/nuruwo8/vrchat-dark-class-generator/blob/main/LICENSE",
+    "author": {
+      "name": "nuruwo8",
+      "url": "https://github.com/nuruwo8"
+    }
+}
