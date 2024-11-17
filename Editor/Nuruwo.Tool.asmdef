@@ -1,0 +1,20 @@
+{
+    "name": "Nuruwo.Tool",
+    "rootNamespace": "Nuruwo.Tool",
+    "references": [
+        "GUID:99835874ee819da44948776e0df4ff1d",
+        "GUID:627c4d5cd580ddf41bd320e784fe8b9d",
+        "GUID:6490804aa441dfe4b88eb56cccbdf081"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
