@@ -1,14 +1,16 @@
 {
-    "name": "com.nuruwo8.dark-class-generator",
-    "version": "2.6.0",
-    "displayName": "DarkClass Generator",
-    "description": "DarkClass is to make your custom Class in UdonSharp.",
-    "unity": "2022.3",
-    "documentationUrl": "https://github.com/nuruwo8/vrchat-dark-class-generator/tree/main",
-    "changelogUrl": "https://github.com/nuruwo8/vrchat-dark-class-generator/commits/main",
-    "licensesUrl": "https://github.com/nuruwo8/vrchat-dark-class-generator/blob/main/LICENSE",
+    "name": "com.nuruwo.dark-class-generator",
+    "displayName": "DarkClassGenerator",
+    "version": "2.6.1",
+    "description": "Custom class generator for UdonSharp.",
+    "license": "CC0-1.0",
     "author": {
-      "name": "nuruwo8",
-      "url": "https://github.com/nuruwo8"
+        "name": "nuruwo",
+        "email": "nuruwo999@gmail.com",
+        "url": "https://github.com/nuruwo8"
+    },
+    "url": "https://github.com/koyashiro/udon-sha2/releases/download/v0.1.1/net.koyashiro.udonsha2-0.1.1.zip",
+    "vpmDependencies": {
+        "com.vrchat.worlds": "^3.x.x"
     }
 }

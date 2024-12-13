@@ -14,7 +14,7 @@ using UnityEngine;
 using VRC.SDK3.Data;
 using VRC.Udon.Editor;
 
-namespace Nuruwo.Tool
+namespace Nuruwo.DarkClassGenerator
 {
 
     /// <summary>
