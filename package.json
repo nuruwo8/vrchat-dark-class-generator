@@ -9,7 +9,7 @@
         "email": "nuruwo999@gmail.com",
         "url": "https://github.com/nuruwo8"
     },
-    "url": "https://github.com/koyashiro/udon-sha2/releases/download/v0.1.1/net.koyashiro.udonsha2-0.1.1.zip",
+    "url": "",
     "vpmDependencies": {
         "com.vrchat.worlds": "^3.x.x"
     }
