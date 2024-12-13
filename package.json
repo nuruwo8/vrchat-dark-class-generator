@@ -1,7 +1,7 @@
 {
     "name": "com.nuruwo.dark-class-generator",
     "displayName": "DarkClassGenerator",
-    "version": "2.6.1",
+    "version": "2.6.2",
     "description": "Custom class generator for UdonSharp.",
     "license": "CC0-1.0",
     "author": {
@@ -9,7 +9,7 @@
         "email": "nuruwo999@gmail.com",
         "url": "https://github.com/nuruwo8"
     },
-    "url": "https://github.com/nuruwo8/vrchat-dark-class-generator/releases/download/V2.6.1/DarkClassGenerator.zip",
+    "url": "https://github.com/nuruwo8/vrchat-dark-class-generator/releases/download/V2.6.2/DarkClassGenerator.zip",
     "vpmDependencies": {
         "com.vrchat.worlds": "^3.x.x"
     }
