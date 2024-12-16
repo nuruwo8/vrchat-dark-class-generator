@@ -2,9 +2,8 @@
 DarkClass is to make your custom Class in UdonSharp.
 
 ## Instal
-1. install the nuruwo's repository list into VCC from This link.</br>
-[Install link](https://nuruwo8.github.io/nuruwo-vpm-list/install)</br></br>
-
+1. Install the nuruwo's repository list into VCC from This link.</br>
+[Install link](https://nuruwo8.github.io/nuruwo-vpm-list/install)</br>
 2. Import "DarkClassGenerator" into your Unity project using VCC.
 
 ## Usage. Please read this article.
