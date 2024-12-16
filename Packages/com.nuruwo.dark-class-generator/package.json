@@ -4,6 +4,7 @@
   "version": "2.6.2",
   "description": "Custom class generator for UdonSharp.",
   "license": "CC0-1.0",
+  "unity": "2022.3",
   "vpmDependencies": {
     "com.vrchat.worlds": "^3.x.x"
   },
