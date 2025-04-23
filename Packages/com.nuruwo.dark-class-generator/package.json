@@ -1,7 +1,7 @@
 {
   "name": "com.nuruwo.dark-class-generator",
   "displayName": "DarkClassGenerator",
-  "version": "2.6.2",
+  "version": "2.6.3",
   "description": "Custom class generator for UdonSharp.",
   "license": "CC0-1.0",
   "unity": "2022.3",

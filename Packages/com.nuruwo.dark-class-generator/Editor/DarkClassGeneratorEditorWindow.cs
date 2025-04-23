@@ -217,7 +217,8 @@ namespace Nuruwo.DarkClassGenerator
                 if (string.IsNullOrEmpty(argumentType)) { continue; }
                 var pArgumentName = ToPascal(argumentName);
                 var typeIsReference = CheckDataTokenTypeIsReference(argumentType);
-                var arg = typeIsReference ? $"new DataToken({argumentName})" : $"{argumentName}";
+                var typeIsChar = argumentType == "char";    //For some reason, if the char type is not specified as new DataToken, an error occurs in U#.
+                var arg = typeIsReference || typeIsChar ? $"new DataToken({argumentName})" : $"{argumentName}";
 
                 AppendLine($"data[(int){EnumName}.{pArgumentName}] = {arg};");
             }
