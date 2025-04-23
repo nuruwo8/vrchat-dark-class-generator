@@ -532,7 +532,18 @@ namespace Nuruwo.DarkClassGenerator
 
                 AppendLine($"public static {argumentType} {pArgumentName}(this {_className} instance)");
                 Indent();
-                AppendLine($"=> ({argumentType})instance[(int){EnumName}.{pArgumentName}]{dataTokenType};");
+                if (argumentType == "string" || argumentType == "String")
+                {
+                    AppendLine($"=> instance.TryGetValue((int){EnumName}.{pArgumentName}, TokenType.String, out var value) ? (string)value : null;");
+                }
+                else if (argumentType == "DataList" || argumentType == "DataDictionary")
+                {
+                    AppendLine($"=> instance.TryGetValue((int){EnumName}.{pArgumentName}, TokenType.{argumentType}, out var value) ? ({argumentType})value : null;");
+                }
+                else
+                {
+                    AppendLine($"=> ({argumentType})instance[(int){EnumName}.{pArgumentName}]{dataTokenType};");
+                }
                 Outdent();
             }
         }
